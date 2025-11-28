@@ -2,10 +2,8 @@
 # Production Profile (for deployed environments like Hugging Face)
 # ============================================================================
 spring:
-  # Use the full JDBC URL provided by Neon.
-  # This single variable contains the address, user, and password.
   datasource:
-    url: jdbc:postgresql://ep-square-river-adrqhvzb-pooler.c-2.us-east-1.aws.neon.tech/neondb?user=neondb_owner&password=npg_WUb7mp6JIxRn&sslmode=require
+    url: ${SPRING_DATASOURCE_URL}
     driverClassName: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -13,7 +11,11 @@ spring:
       ddl-auto: none # Flyway handles the schema
 
 flyway:
-  # For production, use the common scripts and the postgresql-compatible schema.
-  locations: 
-    - classpath:db/migration/common
-    - classpath:db/migration/postgresql
+  locations: classpath:db/migration/postgresql
+
+logging:
+  level:
+    root: INFO
+    com.aiassistant: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
