@@ -2,6 +2,9 @@
 # Production Profile (for deployed environments like Hugging Face)
 # ============================================================================
 spring:
+  config:
+    activate:
+      on-profile: "prod"
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     driverClassName: org.postgresql.Driver
