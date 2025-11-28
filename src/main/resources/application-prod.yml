@@ -14,7 +14,9 @@ spring:
       ddl-auto: none # Flyway handles the schema
 
 flyway:
-  locations: classpath:db/migration/postgresql
+  # Locations are now handled programmatically in FlywayConfig.java
+  enabled: true
+  baseline-on-migrate: true
 
 logging:
   level:

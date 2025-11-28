@@ -13,11 +13,11 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: none # Let Flyway handle the schema
+      ddl-auto: none # Flyway handles the schema
   flyway:
-    locations: 
-      - classpath:db/migration/common
-      - classpath:db/migration/sqlite 
+    # Locations are now handled programmatically in FlywayConfig.java
+    enabled: true
+    baseline-on-migrate: true
 
 logging:
   level:
