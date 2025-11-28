@@ -30,10 +30,11 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/api/widget/**", 
-                    "/api/auth/**", 
+                    "/api/auth/**",
+                    "/api/clients/**", // Allow requests to be handled by the AdminKeyFilter
                     "/widget.js", 
                     "/test-client.html",
-                    "/admin.html" // Re-add the admin page to the permit list
+                    "/admin.html"
                 ).permitAll()
                 .anyRequest().denyAll()
             )

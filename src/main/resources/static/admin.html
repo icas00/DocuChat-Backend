@@ -52,7 +52,7 @@
         <h2>Step 3: Install on Your Website</h2>
         <div class="code-box">
             &lt;script 
-              src="http://localhost:8080/widget.js" 
+              src="https://icas00-docchat.hf.space/widget.js" 
               data-api-key="TEST_KEY" 
               defer&gt;
             &lt;/script&gt;
@@ -95,7 +95,7 @@
         formData.append('file', selectedFile);
 
         try {
-            const response = await fetch('http://localhost:8080/api/clients/1/documents', {
+            const response = await fetch('https://icas00-docchat.hf.space/api/clients/1/documents', {
                 method: 'POST',
                 headers: { 'X-Admin-Key': 'demo-secret-key' },
                 body: formData
@@ -121,7 +121,7 @@
         uploadBtn.disabled = true; // Disable upload button during indexing
 
         try {
-            const response = await fetch('http://localhost:8080/api/clients/1/index', {
+            const response = await fetch('https://icas00-docchat.hf.space/api/clients/1/index', {
                 method: 'POST',
                 headers: { 'X-Admin-Key': 'demo-secret-key' }
             });
