@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuChat - Test Client Page</title>
+    <style>
+        body { 
+            font-family: 'Arial', sans-serif; 
+            padding: 2em; 
+            background-color: #f0f2f5; 
+            color: #333; /* Ensure text is visible */
+        }
+        h1 { color: #1c1e21; }
+        p { color: #606770; }
+        .demo-instructions {
+            background-color: #e6f7ff;
+            border-left: 5px solid #1890ff;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .demo-instructions strong {
+            color: #1890ff;
+        }
+    </style>
+</head>
+<body>
+    <h1>DocuChat - Live Test Page</h1>
+    <p>This page simulates a client's website where your AI chat widget is embedded.</p>
+    
+    <div class="demo-instructions">
+        <p><strong>Instructions:</strong></p>
+        <p>This bot is currently powered by the document you just uploaded and indexed via the <a href="/admin.html" target="_blank">Admin Dashboard</a>.</p>
+        <p>Click the red chat bubble in the bottom-right corner to interact with your custom AI assistant.</p>
+        <p>Ask questions based on the content of the document you provided!</p>
+    </div>
+
+    <!-- The chat widget script is included here -->
+    <script 
+        src="http://localhost:8080/widget.js" 
+        data-api-key="TEST_KEY" 
+        defer>
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# ============================================================================
+# Production Profile (for deployed environments like Hugging Face)
+# ============================================================================
+spring:
+  # Use the full JDBC URL provided by Neon.
+  # This single variable contains the address, user, and password.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    driverClassName: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none # Flyway handles the schema
+
+flyway:
+  # For production, use the common scripts and the mysql-compatible schema.
+  # PostgreSQL is highly compatible with MySQL's syntax for our simple schema.
+  locations: 
+    - classpath:db/migration/common
+    - classpath:db/migration/mysql

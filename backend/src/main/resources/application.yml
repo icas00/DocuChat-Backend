@@ -1,0 +1,62 @@
+# ============================================================================
+# Base Application Configuration
+# ============================================================================
+app:
+  admin-key: ${APP_ADMIN_KEY:demo-secret-key}
+
+spring:
+  application:
+    name: ai-assistant-platform
+  main:
+    banner-mode: "off"
+  jackson:
+    default-property-inclusion: non_null
+  sql:
+    init:
+      mode: never
+  codec:
+    max-in-memory-size: 10MB
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+flyway:
+  enabled: true
+  baseline-on-migrate: true
+
+server:
+  port: ${PORT:8080}
+
+# --- MODEL ADAPTER CONFIGURATION ---
+model:
+  adapter: ${MODEL_ADAPTER:remote}
+  remote:
+    chat:
+      provider: openai
+      endpoint: https://openrouter.ai/api/v1/chat/completions
+      key: ${REMOTE_CHAT_KEY}
+      model: openai/gpt-4o-mini
+
+    embedding:
+      provider: openai
+      endpoint: https://openrouter.ai/api/v1/embeddings
+      key: ${REMOTE_EMBEDDING_KEY}
+      model: sentence-transformers/multi-qa-mpnet-base-dot-v1
+
+# Retrieval Configuration
+retrieval:
+  top-k: 15
+  min-similarity-threshold: 0.5
+
+# Cache Configuration
+cache:
+  ttl-seconds: ${CACHE_TTL_SECONDS:60}
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.aiassistant: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG

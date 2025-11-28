@@ -1,0 +1,31 @@
+# ============================================================================
+# Development Profile (for local running)
+# ============================================================================
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driverClassName: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: none # Let Flyway handle the schema
+  flyway:
+    locations: 
+      - classpath:db/migration/common
+      - classpath:db/migration/sqlite 
+
+logging:
+  level:
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+
+# --- API KEY CONFIGURATION ---
+# We now use two separate keys for the two services.
+model:
+  remote:
+    chat:
+      key: ${REMOTE_CHAT_KEY} # Your Groq key
+    embedding:
+      key: ${REMOTE_EMBEDDING_KEY} # Your OpenRouter/Proxy key

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ai-assistant-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ai_assistant
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-assistant-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-assistant-backend
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/ai_assistant?useSSL=false&allowPublicKeyRetrieval=true
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-rootpass}
+      DB_DRIVER_CLASS: com.mysql.cj.jdbc.Driver
+      DB_DIALECT: org.hibernate.dialect.MySQL8Dialect
+      JWT_SECRET: ${JWT_SECRET:-verysecretkeythatshouldbechangedinproduction1234567890}
+      MODEL_ADAPTER: ${MODEL_ADAPTER:-remote}
+      REMOTE_MODEL_ENDPOINT: ${REMOTE_MODEL_ENDPOINT:-https://api.openai.com/v1/chat/completions}
+      REMOTE_MODEL_KEY: ${REMOTE_MODEL_KEY}
+      REMOTE_EMBEDDING_ENDPOINT: ${REMOTE_EMBEDDING_ENDPOINT:-https://api.openai.com/v1/embeddings}
+      STT_ADAPTER: ${STT_ADAPTER:-remote}
+      TTS_ADAPTER: ${TTS_ADAPTER:-remote}
+      TELEPHONY_PROVIDER: ${TELEPHONY_PROVIDER:-none}
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - ai-assistant-network
+
+volumes:
+  mysql_data:
+
+networks:
+  ai-assistant-network:
+    driver: bridge
