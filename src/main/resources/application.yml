@@ -15,7 +15,7 @@ spring:
     init:
       mode: never
   datasource:
-    url: jdbc:postgresql://ep-square-river-adrqhvzb-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-square-river-adrqhvzb-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -61,7 +61,7 @@ retrieval:
 
 # Cache Configuration
 cache:
-  ttl-seconds: ${CACHE_TTL_SECONDS:60}
+  ttl-seconds: 60
 
 # Logging
 logging:

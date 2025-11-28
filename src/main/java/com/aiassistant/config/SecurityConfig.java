@@ -31,7 +31,6 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/widget/**", 
                     "/api/auth/**", 
-                    "/api/clients/**", 
                     "/widget.js", 
                     "/test-client.html",
                     "/admin.html" // Re-add the admin page to the permit list
