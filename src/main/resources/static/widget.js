@@ -2,7 +2,10 @@
     // 1. Get the Configuration
     const scriptTag = document.currentScript;
     const apiKey = scriptTag.getAttribute('data-api-key');
-    const backendUrl = "http://localhost:8080"; 
+    
+    // Dynamically determine the backend URL from the script's own src
+    const scriptSrc = new URL(scriptTag.src);
+    const backendUrl = scriptSrc.origin;
 
     if (!apiKey) {
         console.error("DocuChat: Missing data-api-key attribute.");

@@ -8,6 +8,11 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     driverClassName: org.postgresql.Driver
+    hikari:
+      # Settings to keep the connection pool healthy with a serverless DB like Neon
+      max-lifetime: 600000   # 10 minutes
+      idle-timeout: 300000   # 5 minutes
+      keepalive-time: 120000 # 2 minutes
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
