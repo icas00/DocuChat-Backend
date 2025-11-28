@@ -1,3 +1,11 @@
+---
+title: DocChat Platform
+emoji: 🚀
+colorFrom: red
+colorTo: pink
+sdk: docker
+app_port: 7860
+---
 # Embeddable AI Chat Widget - Backend
 
 This project is the backend service for a multi-tenant, embeddable AI chat widget platform. It is a Spring Boot application designed to provide a RAG (Retrieval-Augmented Generation) pipeline, allowing multiple clients to have a custom chatbot on their websites powered by their own knowledge base documents.
