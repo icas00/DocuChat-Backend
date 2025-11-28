@@ -1,7 +1,6 @@
 package com.aiassistant.config;
 
-import org.flywaydb.core.Flyway;
-import org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy;
+import org.springframework.boot.autoconfigure.flyway.FlywayConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -12,8 +11,8 @@ import java.util.Arrays;
 public class FlywayConfig {
 
     @Bean
-    public FlywayMigrationStrategy flywayMigrationStrategy(Environment environment) {
-        return flyway -> {
+    public FlywayConfigurationCustomizer flywayConfigurationCustomizer(Environment environment) {
+        return configuration -> {
             String[] activeProfiles = environment.getActiveProfiles();
             String[] locations;
 
@@ -25,8 +24,8 @@ public class FlywayConfig {
                 locations = new String[]{"classpath:db/migration/common", "classpath:db/migration/sqlite"};
             }
             
-            // Manually set the locations, overriding any and all property-based configurations
-            flyway.configure().locations(locations).load().migrate();
+            // Customize the locations for the auto-configured Flyway instance
+            configuration.locations(locations);
         };
     }
 }
