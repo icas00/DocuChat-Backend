@@ -32,7 +32,7 @@ public class SecurityConfig {
                     "/api/widget/**", 
                     "/api/auth/**",
                     "/api/clients/**", // Allow requests to be handled by the AdminKeyFilter
-                    "/widget.js", 
+                    "/widget.js",
                     "/test-client.html",
                     "/admin.html"
                 ).permitAll()

@@ -17,10 +17,10 @@ public class FlywayConfig {
             String[] locations;
 
             if (Arrays.stream(activeProfiles).anyMatch(p -> p.equalsIgnoreCase("prod"))) {
-                // For production, only use the postgresql migrations
-                locations = new String[]{"classpath:db/migration/postgresql"};
+                // For production, use common seed data and the postgresql schema
+                locations = new String[]{"classpath:db/migration/common", "classpath:db/migration/postgresql"};
             } else {
-                // For development (or any other profile), use common and sqlite
+                // For development, use common seed data and the sqlite schema
                 locations = new String[]{"classpath:db/migration/common", "classpath:db/migration/sqlite"};
             }
             
