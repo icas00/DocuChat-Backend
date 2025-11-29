@@ -24,6 +24,35 @@
     padding-bottom: 10px;
 }
 
+/* Form Group Styling for Customization */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="color"] {
+    width: 100%;
+    padding: 10px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 1em;
+    box-sizing: border-box;
+}
+
+.form-group input[type="color"] {
+    padding: 5px;
+    height: 45px;
+}
+
 .upload-area {
     background: var(--bg-primary);
     border: 2px dashed var(--border-color);

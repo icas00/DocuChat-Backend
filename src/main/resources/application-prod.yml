@@ -13,6 +13,8 @@ spring:
       max-lifetime: 600000   # 10 minutes
       idle-timeout: 300000   # 5 minutes
       keepalive-time: 120000 # 2 minutes
+      # Most important setting: Validate connections before use
+      connection-test-query: "SELECT 1"
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:

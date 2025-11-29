@@ -1,5 +1,10 @@
 (function() {
     const scriptTag = document.currentScript;
+    if (!scriptTag) {
+        console.error("DocuChat: Cannot find current script tag.");
+        return;
+    }
+
     const apiKey = scriptTag.getAttribute('data-api-key');
     const scriptSrc = new URL(scriptTag.src);
     const backendUrl = scriptSrc.origin;
@@ -11,32 +16,67 @@
 
     // --- Default Settings ---
     let settings = {
-        widgetColor: '#e11d48',
+        widgetColor: '#007aff',
         chatbotName: 'AI Assistant',
         welcomeMessage: 'Hi! How can I help you today?'
     };
 
     const host = document.createElement('div');
+    host.id = 'docuchat-widget-host';
     document.body.appendChild(host);
     const shadowRoot = host.attachShadow({ mode: 'open' });
 
     const renderWidget = () => {
         shadowRoot.innerHTML = `
             <style>
+                :host {
+                    all: initial; /* Reset all inherited styles */
+                }
                 .docu-widget-btn {
+                    position: fixed; bottom: 20px; right: 20px;
+                    width: 60px; height: 60px;
                     background: ${settings.widgetColor};
-                    /* ... other styles ... */
+                    border-radius: 50%; cursor: pointer;
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                    display: flex; align-items: center; justify-content: center;
+                    z-index: 9999; transition: transform 0.3s;
+                    border: none;
+                }
+                .docu-widget-btn:hover { transform: scale(1.1); }
+                .docu-widget-box {
+                    position: fixed; bottom: 100px; right: 20px;
+                    width: 350px; height: 500px;
+                    background: white; border-radius: 20px;
+                    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+                    display: none; flex-direction: column;
+                    z-index: 9999; overflow: hidden;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 }
                 .docu-header {
                     background: #0f172a; color: white;
                     padding: 20px; font-weight: bold;
                     display: flex; align-items: center; gap: 10px;
                 }
+                .docu-messages {
+                    flex: 1; padding: 15px; overflow-y: auto;
+                    background: #f8fafc; display: flex; flex-direction: column; gap: 10px;
+                }
+                .docu-msg {
+                    max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.4;
+                }
+                .docu-msg.bot { background: white; border: 1px solid #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; color: #333; }
+                .docu-msg.user { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+                .docu-input-area {
+                    padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;
+                }
+                .docu-input {
+                    flex: 1; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; font-size: 14px;
+                }
                 .docu-send {
                     background: ${settings.widgetColor};
-                    /* ... other styles ... */
+                    color: white; border: none;
+                    padding: 0 15px; border-radius: 8px; cursor: pointer; font-weight: bold;
                 }
-                /* ... all other styles ... */
             </style>
             
             <div class="docu-widget-btn">
@@ -46,7 +86,7 @@
             <div class="docu-widget-box">
                 <div class="docu-header">
                     <div style="width:8px; height:8px; background:#4ade80; border-radius:50%"></div>
-                    ${settings.chatbotName}
+                    <span id="chatbot-name">${settings.chatbotName}</span>
                 </div>
                 <div class="docu-messages">
                     <div class="docu-msg bot">${settings.welcomeMessage}</div>
@@ -58,7 +98,6 @@
             </div>
         `;
 
-        // Re-query elements and attach event listeners after rendering
         const widgetButton = shadowRoot.querySelector('.docu-widget-btn');
         const chatBox = shadowRoot.querySelector('.docu-widget-box');
         const messagesContainer = shadowRoot.querySelector('.docu-messages');
@@ -87,11 +126,12 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ apiKey: apiKey, message: text, history: chatHistory })
                 });
+                if (!res.ok) throw new Error("Network response was not ok.");
                 const data = await res.json();
                 addMessage(data.text, 'bot');
                 chatHistory.push('Assistant: ' + data.text);
             } catch(e) {
-                addMessage("Could not connect to server.", 'bot');
+                addMessage("Sorry, I'm having trouble connecting. Please try again later.", 'bot');
             }
         };
 
@@ -109,16 +149,31 @@
         }
     };
 
-    // Fetch settings and then render the widget
+    const updateWidgetSettings = (newSettings) => {
+        const widgetButton = shadowRoot.querySelector('.docu-widget-btn');
+        const sendButton = shadowRoot.querySelector('.docu-send');
+        const chatbotName = shadowRoot.querySelector('#chatbot-name');
+        
+        if (widgetButton) widgetButton.style.background = newSettings.widgetColor;
+        if (sendButton) sendButton.style.background = newSettings.widgetColor;
+        if (chatbotName) chatbotName.innerText = newSettings.chatbotName;
+        // Welcome message is only set on initial render, so no update needed here.
+    };
+
+    // 1. Render the widget immediately with default settings.
+    renderWidget();
+
+    // 2. Fetch custom settings and update the widget if they exist.
     fetch(`${backendUrl}/api/widget/settings?apiKey=${apiKey}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error("Settings not found.");
+            return response.json();
+        })
         .then(data => {
             if (data) {
                 settings = { ...settings, ...data };
+                updateWidgetSettings(settings);
             }
         })
-        .catch(error => console.error("DocuChat: Failed to fetch custom settings.", error))
-        .finally(() => {
-            renderWidget();
-        });
+        .catch(error => console.error("DocuChat: Could not fetch custom settings. Using defaults.", error));
 })();

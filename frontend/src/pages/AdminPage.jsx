@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/AdminPage.css';
 
@@ -141,35 +141,49 @@ const AdminPage = () => {
 
             <div className="step">
                 <h2>Step 1: Upload Knowledge Base</h2>
-                {/* ... upload UI ... */}
+                <div className="upload-area" onDragOver={handleDragOver} onDrop={handleDrop}>
+                    <input type="file" id="file-upload" accept=".txt,.md,.pdf" style={{ display: 'none' }} onChange={(e) => handleFileChange(e.target.files[0])} />
+                    <label htmlFor="file-upload" className="btn">Choose File</label>
+                    <p>{fileName}</p>
+                </div>
+                <button className="btn" onClick={handleUpload} disabled={!selectedFile || status.upload.processing}>Upload Document</button>
+                <Status {...status.upload} />
             </div>
 
             <div className="step">
-                <h2>Step 2: Customize Widget</h2>
+                <h2>Step 2: Index Document</h2>
+                <button className="btn" onClick={handleIndex} disabled={status.upload.message !== '✅ Upload complete!' || status.index.processing}>Create Embeddings</button>
+                <Status {...status.index} />
+            </div>
+
+            <div className="step">
+                <h2>Step 3: Customize Widget</h2>
                 <div className="form-group">
                     <label htmlFor="chatbotName">Chatbot Name</label>
-                    <input type="text" name="chatbotName" value={settings.chatbotName} onChange={handleSettingsChange} />
+                    <input type="text" id="chatbotName" name="chatbotName" value={settings.chatbotName} onChange={handleSettingsChange} />
                 </div>
                 <div className="form-group">
                     <label htmlFor="welcomeMessage">Welcome Message</label>
-                    <input type="text" name="welcomeMessage" value={settings.welcomeMessage} onChange={handleSettingsChange} />
+                    <input type="text" id="welcomeMessage" name="welcomeMessage" value={settings.welcomeMessage} onChange={handleSettingsChange} />
                 </div>
                 <div className="form-group">
                     <label htmlFor="widgetColor">Widget Color</label>
-                    <input type="color" name="widgetColor" value={settings.widgetColor} onChange={handleSettingsChange} />
+                    <input type="color" id="widgetColor" name="widgetColor" value={settings.widgetColor} onChange={handleSettingsChange} />
                 </div>
                 <button className="btn" onClick={handleSaveSettings} disabled={status.settings.processing}>Save Settings</button>
                 <Status {...status.settings} />
             </div>
 
             <div className="step">
-                <h2>Step 3: Index Document</h2>
-                {/* ... index UI ... */}
-            </div>
-
-            <div className="step">
                 <h2>Step 4: Install on Your Website</h2>
-                {/* ... install UI ... */}
+                <div className="code-box">
+                    <button className="copy-btn" onClick={handleCopyCode}>Copy</button>
+                    <pre><code>{`<script 
+  src="${API_BASE_URL}/widget.js" 
+  data-api-key="TEST_KEY" 
+  defer>
+</script>`}</code></pre>
+                </div>
             </div>
 
             {isIndexingComplete && (
@@ -180,7 +194,8 @@ const AdminPage = () => {
 
             <div className="step">
                 <h2>Maintenance</h2>
-                {/* ... clear data UI ... */}
+                <button className="btn warn" onClick={handleClearData} disabled={status.clear.processing}>Clear All Data</button>
+                <Status {...status.clear} />
             </div>
         </div>
     );
