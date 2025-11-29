@@ -7,8 +7,10 @@ import com.aiassistant.model.Client;
 import com.aiassistant.service.ChatService;
 import com.aiassistant.service.ClientService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,13 +23,12 @@ public class WidgetController {
     private final ChatService chatService;
     private final ClientService clientService;
 
-    @PostMapping("/chat")
-    public ResponseEntity<AnswerDTO> chat(@RequestBody WidgetRequest request) {
+    @PostMapping(value = "/stream-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> streamChat(@RequestBody WidgetRequest request) {
         try {
-            AnswerDTO answer = chatService.processMessage(request.getApiKey(), request.getMessage(), request.getHistory());
-            return ResponseEntity.ok(answer);
+            return chatService.processStreamingMessage(request.getApiKey(), request.getMessage(), request.getHistory());
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(new AnswerDTO(e.getMessage(), List.of(), 0.0));
+            return Flux.just("Error: " + e.getMessage());
         }
     }
 

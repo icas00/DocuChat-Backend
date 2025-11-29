@@ -64,17 +64,6 @@
                 }
                 .docu-msg.bot { background: white; border: 1px solid #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; color: #333; }
                 .docu-msg.user { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-                .cached-badge {
-                    position: absolute;
-                    top: -8px;
-                    right: -8px;
-                    background: #ffc107;
-                    color: #333;
-                    padding: 2px 6px;
-                    border-radius: 8px;
-                    font-size: 9px;
-                    font-weight: bold;
-                }
                 .docu-input-area {
                     padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;
                 }
@@ -128,18 +117,42 @@
             addMessage(text, 'user');
             chatHistory.push('User: ' + text);
             input.value = '';
+            input.disabled = true;
+            sendButton.disabled = true;
+
+            const botMessageElement = addMessage('', 'bot');
+            let fullBotResponse = '';
 
             try {
-                const res = await fetch(`${backendUrl}/api/widget/chat`, {
+                const response = await fetch(`${backendUrl}/api/widget/stream-chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ apiKey: apiKey, message: text, history: chatHistory })
                 });
-                if (!res.ok) throw new Error("Network response was not ok.");
-                const data = await res.json();
-                addMessage(data.text, 'bot', data.fromCache); // Pass the fromCache flag
+
+                if (!response.body) throw new Error("Streaming not supported.");
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    fullBotResponse += chunk;
+                    botMessageElement.innerText = fullBotResponse;
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+                
+                chatHistory.push('Assistant: ' + fullBotResponse);
+
             } catch(e) {
-                addMessage("Sorry, I'm having trouble connecting. Please try again later.", 'bot');
+                botMessageElement.innerText = "Sorry, I'm having trouble connecting.";
+            } finally {
+                input.disabled = false;
+                sendButton.disabled = false;
+                input.focus();
             }
         };
 
@@ -148,18 +161,13 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        function addMessage(text, role, fromCache = false) {
+        function addMessage(text, role) {
             const div = document.createElement('div');
             div.className = `docu-msg ${role}`;
             div.innerText = text;
-            if (role === 'bot' && fromCache) {
-                const badge = document.createElement('span');
-                badge.className = 'cached-badge';
-                badge.innerText = 'Cached';
-                div.appendChild(badge);
-            }
             messagesContainer.appendChild(div);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return div;
         }
     };
 

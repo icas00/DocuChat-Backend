@@ -5,6 +5,7 @@ import com.aiassistant.model.FaqDoc;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -14,16 +15,10 @@ import java.util.List;
 public class LocalModelAdapter implements ModelAdapter {
 
     @Override
-    public AnswerDTO generateAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs, List<String> history) {
-        log.warn("LocalModelAdapter is active. It will return a dummy response.");
-        String combinedDocs = relevantDocs.stream()
-                .map(FaqDoc::getAnswer)
-                .reduce("", (a, b) -> a + "\n" + b);
-        
-        String responseText = "This is a dummy response from the local adapter. " +
-                              "Based on the documents, the answer might be related to: " + combinedDocs;
-        
-        return new AnswerDTO(responseText, List.of("Local Source"), 0.5);
+    public Flux<String> generateStreamingAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs, List<String> history) {
+        log.warn("LocalModelAdapter is active. It does not support streaming and will return a dummy response.");
+        String responseText = "This is a dummy response from the local adapter. Streaming is not supported.";
+        return Flux.just(responseText);
     }
 
     @Override
@@ -36,7 +31,6 @@ public class LocalModelAdapter implements ModelAdapter {
     @Override
     public float[] generateEmbedding(String text) {
         log.warn("LocalModelAdapter is active. It will return a dummy embedding vector.");
-        // Return a fixed-size array of zeros as a placeholder.
         return new float[768];
     }
 }

@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,6 @@ public class RemoteModelAdapter implements ModelAdapter {
     private final ObjectMapper objectMapper;
     private final ModelProviderProperties properties;
 
-    // Stricter, more adversarial system prompt.
     private static final String STANDARD_SYSTEM_PROMPT = 
         "You are an AI assistant with a very specific and strict set of rules. You MUST follow these rules without exception. " +
         "RULE 1: Your primary function is to answer questions based *only* on the text provided in the KNOWLEDGE BASE. " +
@@ -44,23 +44,30 @@ public class RemoteModelAdapter implements ModelAdapter {
         "DO NOT invent an answer. Example: 'I'm sorry, I don't have specific details about that. I can answer questions about topics like membership, billing, and facility hours.'";
 
     @Override
-    public AnswerDTO generateAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs, List<String> history) {
+    public Flux<String> generateStreamingAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs, List<String> history) {
         String userPrompt = buildUserPrompt(prompt, relevantDocs);
-        return callChatApi(STANDARD_SYSTEM_PROMPT, userPrompt, history, relevantDocs);
+        List<Map<String, String>> messages = buildMessageHistory(STANDARD_SYSTEM_PROMPT, userPrompt, history);
+        
+        Map<String, Object> requestBody = Map.of(
+            "model", properties.getChat().getModel(),
+            "messages", messages,
+            "stream", true
+        );
+
+        return webClient.post()
+                .uri(properties.getChat().getEndpoint())
+                .header("Authorization", "Bearer " + properties.getChat().getKey())
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .mapNotNull(this::extractContentFromStream);
     }
 
     @Override
     public AnswerDTO generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
-        return callChatApi(FALLBACK_SYSTEM_PROMPT, prompt, history, List.of());
-    }
-
-    private AnswerDTO callChatApi(String systemPrompt, String userPrompt, List<String> history, List<FaqDoc> relevantDocs) {
-        List<Map<String, String>> messages = buildMessageHistory(systemPrompt, userPrompt, history);
-        
-        Map<String, Object> requestBody = Map.of(
-            "model", properties.getChat().getModel(),
-            "messages", messages
-        );
+        List<Map<String, String>> messages = buildMessageHistory(FALLBACK_SYSTEM_PROMPT, prompt, history);
+        Map<String, Object> requestBody = Map.of("model", properties.getChat().getModel(), "messages", messages);
 
         try {
             String jsonResponse = webClient.post()
@@ -71,14 +78,11 @@ public class RemoteModelAdapter implements ModelAdapter {
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
-
             String answerText = extractAnswerFromResponse(jsonResponse);
-            List<String> sources = relevantDocs.stream().map(FaqDoc::getQuestion).collect(Collectors.toList());
-            return new AnswerDTO(answerText, sources, 0.9);
-
+            return new AnswerDTO(answerText, List.of(), 0.0);
         } catch (Exception e) {
-            log.error("Error calling chat API", e);
-            return new AnswerDTO("Error generating answer: " + e.getMessage(), List.of(), 0.0);
+            log.error("Error calling chat API for fallback", e);
+            return new AnswerDTO("Error generating fallback answer.", List.of(), 0.0);
         }
     }
 
@@ -139,6 +143,24 @@ public class RemoteModelAdapter implements ModelAdapter {
         String cleanJson = jsonResponse.substring(jsonResponse.indexOf('{'));
         JsonNode root = objectMapper.readTree(cleanJson);
         return root.path("choices").get(0).path("message").path("content").asText("Sorry, I could not process the response.");
+    }
+    
+    private String extractContentFromStream(String sseEvent) {
+        if (sseEvent.startsWith("data: ")) {
+            String data = sseEvent.substring(6);
+            if (data.trim().equals("[DONE]")) {
+                return null;
+            }
+            try {
+                JsonNode root = objectMapper.readTree(data);
+                JsonNode contentNode = root.path("choices").get(0).path("delta").path("content");
+                return contentNode.isMissingNode() ? null : contentNode.asText();
+            } catch (Exception e) {
+                log.error("Error parsing stream event: {}", sseEvent, e);
+                return null;
+            }
+        }
+        return null;
     }
 
     private float[] extractOpenAIEmbedding(String jsonResponse) throws Exception {
