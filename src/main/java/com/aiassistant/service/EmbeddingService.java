@@ -64,12 +64,11 @@ public class EmbeddingService {
         log.info("Indexing Process Finished.");
     }
 
-    public List<FaqDoc> findRelevantDocs(Long clientId, String query, int k) {
-        log.info("Finding relevant docs for query: '{}'", query);
-        float[] queryVector = modelAdapter.generateEmbedding(query);
+    public List<FaqDoc> findRelevantDocs(Long clientId, float[] queryVector, int k) {
+        log.info("Finding relevant docs for client ID: {}", clientId);
 
         if (queryVector == null || queryVector.length == 0) {
-            log.error("Failed to generate query vector. Returning no documents.");
+            log.error("Invalid query vector provided. Returning no documents.");
             return List.of();
         }
 
