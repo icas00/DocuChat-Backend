@@ -8,6 +8,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.BreakIterator;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -25,17 +29,38 @@ public class ClientService {
     public void saveDocument(Long clientId, String filename, String content) {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
-        
-        String[] chunks = content.split("\n");
-        
-        for (String chunk : chunks) {
-            if (chunk.trim().isEmpty() || chunk.trim().toLowerCase().startsWith("section")) {
-                continue;
+
+        // 1. Split the entire document content into a list of sentences.
+        List<String> sentences = new ArrayList<>();
+        BreakIterator iterator = BreakIterator.getSentenceInstance(Locale.US);
+        iterator.setText(content);
+        int start = iterator.first();
+        for (int end = iterator.next(); end != BreakIterator.DONE; start = end, end = iterator.next()) {
+            String sentence = content.substring(start, end).trim();
+            if (!sentence.isEmpty()) {
+                sentences.add(sentence);
             }
+        }
+
+        // 2. Create overlapping chunks (sentence windowing) for better context.
+        for (int i = 0; i < sentences.size(); i++) {
+            String currentSentence = sentences.get(i);
+            
+            // Get the sentence before (if it exists)
+            String prevSentence = (i > 0) ? sentences.get(i - 1) : "";
+            
+            // Get the sentence after (if it exists)
+            String nextSentence = (i < sentences.size() - 1) ? sentences.get(i + 1) : "";
+
+            // Combine them into a contextual chunk. The main sentence is in the middle.
+            String contextualChunk = (prevSentence + " " + currentSentence + " " + nextSentence).trim();
+
             FaqDoc newDoc = new FaqDoc();
             newDoc.setClient(client);
-            newDoc.setQuestion("Source: " + filename);
-            newDoc.setAnswer(chunk.trim());
+            // The "question" is the core sentence we are indexing on.
+            newDoc.setQuestion(currentSentence); 
+            // The "answer" is the full contextual chunk for the AI to read.
+            newDoc.setAnswer(contextualChunk); 
             faqDocRepository.save(newDoc);
         }
     }
