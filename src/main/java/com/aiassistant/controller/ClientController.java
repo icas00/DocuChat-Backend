@@ -1,6 +1,7 @@
 package com.aiassistant.controller;
 
 import com.aiassistant.dto.ApiResponse;
+import com.aiassistant.dto.ClientSettingsDto;
 import com.aiassistant.service.ClientService;
 import com.aiassistant.service.EmbeddingService;
 import org.slf4j.Logger;
@@ -74,6 +75,20 @@ public class ClientController {
             return ResponseEntity.ok(new ApiResponse(String.format("Successfully deleted %d document(s).", count)));
         } catch (Exception e) {
             logger.error("Error clearing data for client ID: {}", clientId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{clientId}/settings")
+    public ResponseEntity<ApiResponse> updateClientSettings(
+            @PathVariable Long clientId,
+            @RequestBody ClientSettingsDto settings) {
+        logger.info("Updating settings for Client ID: {}", clientId);
+        try {
+            clientService.updateSettings(clientId, settings);
+            return ResponseEntity.ok(new ApiResponse("Settings updated successfully."));
+        } catch (Exception e) {
+            logger.error("Error updating settings for client ID: {}", clientId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(e.getMessage()));
         }
     }

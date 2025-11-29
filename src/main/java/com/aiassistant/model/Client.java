@@ -2,13 +2,17 @@ package com.aiassistant.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDateTime;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
-// Represents one of our customers (e.g., a dental clinic).
-@Data
+import java.time.Instant;
+
 @Entity
 @Table(name = "clients")
+@Data
+@NoArgsConstructor
 public class Client {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -16,12 +20,20 @@ public class Client {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "api_key", unique = true, nullable = false)
-    private String apiKey; // The secret key for this client.
+    @Column(nullable = false, unique = true)
+    private String apiKey;
 
-    @Column(name = "website_url")
     private String websiteUrl;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(columnDefinition = "TEXT")
+    private String widgetColor = "#007aff"; // Default blue
+
+    @Column
+    private String chatbotName = "AI Assistant";
+
+    @Column(columnDefinition = "TEXT")
+    private String welcomeMessage = "Hi! How can I help you today?";
+
+    @CreationTimestamp
+    private Instant createdAt;
 }

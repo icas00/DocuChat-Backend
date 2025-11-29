@@ -1,5 +1,6 @@
 package com.aiassistant.service;
 
+import com.aiassistant.dto.ClientSettingsDto;
 import com.aiassistant.model.Client;
 import com.aiassistant.model.FaqDoc;
 import com.aiassistant.repository.ClientRepository;
@@ -29,8 +30,7 @@ public class ClientService {
     public void saveDocument(Long clientId, String filename, String content) {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
-
-        // 1. Split the entire document content into a list of sentences.
+        
         List<String> sentences = new ArrayList<>();
         BreakIterator iterator = BreakIterator.getSentenceInstance(Locale.US);
         iterator.setText(content);
@@ -42,24 +42,15 @@ public class ClientService {
             }
         }
 
-        // 2. Create overlapping chunks (sentence windowing) for better context.
         for (int i = 0; i < sentences.size(); i++) {
             String currentSentence = sentences.get(i);
-            
-            // Get the sentence before (if it exists)
             String prevSentence = (i > 0) ? sentences.get(i - 1) : "";
-            
-            // Get the sentence after (if it exists)
             String nextSentence = (i < sentences.size() - 1) ? sentences.get(i + 1) : "";
-
-            // Combine them into a contextual chunk. The main sentence is in the middle.
             String contextualChunk = (prevSentence + " " + currentSentence + " " + nextSentence).trim();
 
             FaqDoc newDoc = new FaqDoc();
             newDoc.setClient(client);
-            // The "question" is the core sentence we are indexing on.
             newDoc.setQuestion(currentSentence); 
-            // The "answer" is the full contextual chunk for the AI to read.
             newDoc.setAnswer(contextualChunk); 
             faqDocRepository.save(newDoc);
         }
@@ -70,5 +61,23 @@ public class ClientService {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
         return faqDocRepository.deleteByClient(client);
+    }
+
+    @Transactional
+    public void updateSettings(Long clientId, ClientSettingsDto settings) {
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
+        
+        if (settings.getWidgetColor() != null) {
+            client.setWidgetColor(settings.getWidgetColor());
+        }
+        if (settings.getChatbotName() != null) {
+            client.setChatbotName(settings.getChatbotName());
+        }
+        if (settings.getWelcomeMessage() != null) {
+            client.setWelcomeMessage(settings.getWelcomeMessage());
+        }
+        
+        clientRepository.save(client);
     }
 }
