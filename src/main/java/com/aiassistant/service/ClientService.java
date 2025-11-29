@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +25,15 @@ public class ClientService {
 
     public Optional<Client> findByApiKey(String apiKey) {
         return clientRepository.findByApiKey(apiKey);
+    }
+
+    @Transactional
+    public Client createClient(String name) {
+        Client client = new Client();
+        client.setName(name);
+        client.setApiKey("DOC-" + UUID.randomUUID().toString());
+        client.setAdminKey("ADM-" + UUID.randomUUID().toString());
+        return clientRepository.save(client);
     }
 
     @Transactional

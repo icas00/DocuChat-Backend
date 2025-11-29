@@ -2,6 +2,8 @@ package com.aiassistant.controller;
 
 import com.aiassistant.dto.ApiResponse;
 import com.aiassistant.dto.ClientSettingsDto;
+import com.aiassistant.dto.CreateClientResponse;
+import com.aiassistant.model.Client;
 import com.aiassistant.service.ClientService;
 import com.aiassistant.service.EmbeddingService;
 import org.slf4j.Logger;
@@ -30,6 +32,17 @@ public class ClientController {
     public ClientController(EmbeddingService embeddingService, ClientService clientService) {
         this.embeddingService = embeddingService;
         this.clientService = clientService;
+    }
+
+    @PostMapping("/create")
+    public ResponseEntity<CreateClientResponse> createClient() {
+        Client client = clientService.createClient("New Client");
+        CreateClientResponse response = new CreateClientResponse(
+            client.getId(),
+            client.getApiKey(),
+            client.getAdminKey()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping(value = "/{clientId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

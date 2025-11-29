@@ -23,6 +23,9 @@ public class Client {
     @Column(nullable = false, unique = true)
     private String apiKey;
 
+    @Column(nullable = false, unique = true)
+    private String adminKey;
+
     private String websiteUrl;
 
     @Column(columnDefinition = "TEXT")
