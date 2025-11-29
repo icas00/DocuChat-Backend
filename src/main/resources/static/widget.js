@@ -14,7 +14,6 @@
         return;
     }
 
-    // --- Default Settings ---
     let settings = {
         widgetColor: '#007aff',
         chatbotName: 'AI Assistant',
@@ -29,9 +28,7 @@
     const renderWidget = () => {
         shadowRoot.innerHTML = `
             <style>
-                :host {
-                    all: initial; /* Reset all inherited styles */
-                }
+                :host { all: initial; }
                 .docu-widget-btn {
                     position: fixed; bottom: 20px; right: 20px;
                     width: 60px; height: 60px;
@@ -63,9 +60,21 @@
                 }
                 .docu-msg {
                     max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.4;
+                    position: relative;
                 }
                 .docu-msg.bot { background: white; border: 1px solid #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; color: #333; }
                 .docu-msg.user { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+                .cached-badge {
+                    position: absolute;
+                    top: -8px;
+                    right: -8px;
+                    background: #ffc107;
+                    color: #333;
+                    padding: 2px 6px;
+                    border-radius: 8px;
+                    font-size: 9px;
+                    font-weight: bold;
+                }
                 .docu-input-area {
                     padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;
                 }
@@ -128,8 +137,7 @@
                 });
                 if (!res.ok) throw new Error("Network response was not ok.");
                 const data = await res.json();
-                addMessage(data.text, 'bot');
-                chatHistory.push('Assistant: ' + data.text);
+                addMessage(data.text, 'bot', data.fromCache); // Pass the fromCache flag
             } catch(e) {
                 addMessage("Sorry, I'm having trouble connecting. Please try again later.", 'bot');
             }
@@ -140,10 +148,16 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        function addMessage(text, role) {
+        function addMessage(text, role, fromCache = false) {
             const div = document.createElement('div');
             div.className = `docu-msg ${role}`;
             div.innerText = text;
+            if (role === 'bot' && fromCache) {
+                const badge = document.createElement('span');
+                badge.className = 'cached-badge';
+                badge.innerText = 'Cached';
+                div.appendChild(badge);
+            }
             messagesContainer.appendChild(div);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
@@ -157,13 +171,10 @@
         if (widgetButton) widgetButton.style.background = newSettings.widgetColor;
         if (sendButton) sendButton.style.background = newSettings.widgetColor;
         if (chatbotName) chatbotName.innerText = newSettings.chatbotName;
-        // Welcome message is only set on initial render, so no update needed here.
     };
 
-    // 1. Render the widget immediately with default settings.
     renderWidget();
 
-    // 2. Fetch custom settings and update the widget if they exist.
     fetch(`${backendUrl}/api/widget/settings?apiKey=${apiKey}`)
         .then(response => {
             if (!response.ok) throw new Error("Settings not found.");

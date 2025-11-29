@@ -1,39 +1,66 @@
 package com.aiassistant.service;
 
-
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import com.aiassistant.dto.AnswerDTO;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.TimeUnit;
-import java.util.List; // Redundant import to force re-compilation
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
-@Slf4j
 @Service
 public class CacheService {
 
-    private final Cache<String, Object> cache;
+    // A thread-safe map to store cached embeddings and their corresponding answers.
+    // Key: A float[] representing the query embedding.
+    // Value: The AnswerDTO that was generated for that query.
+    private final Map<float[], AnswerDTO> semanticCache = new ConcurrentHashMap<>();
+    private static final double SIMILARITY_THRESHOLD = 0.98; // Very high threshold for a confident cache hit
 
-    public CacheService(@Value("${cache.ttl-seconds:300}") int ttlSeconds) {
-        // Set up a simple cache with a time-to-live.
-        this.cache = Caffeine.newBuilder()
-                .expireAfterWrite(ttlSeconds, TimeUnit.SECONDS)
-                .maximumSize(10_000)
-                .build();
-        log.info("Cache initialized with TTL: {} seconds", ttlSeconds);
+    /**
+     * Tries to find a cached answer for a given query embedding.
+     *
+     * @param queryVector The embedding of the user's current query.
+     * @return An Optional containing the cached AnswerDTO if a sufficiently similar query is found, otherwise empty.
+     */
+    public Optional<AnswerDTO> findInCache(float[] queryVector) {
+        for (Map.Entry<float[], AnswerDTO> entry : semanticCache.entrySet()) {
+            float[] cachedVector = entry.getKey();
+            double similarity = calculateCosineSimilarity(queryVector, cachedVector);
+
+            if (similarity >= SIMILARITY_THRESHOLD) {
+                AnswerDTO cachedAnswer = entry.getValue();
+                // Mark the answer as coming from the cache for debugging/display purposes.
+                cachedAnswer.setFromCache(true); 
+                return Optional.of(cachedAnswer);
+            }
+        }
+        return Optional.empty();
     }
 
-    public void put(String key, Object value) {
-        cache.put(key, value);
+    /**
+     * Adds a new entry to the semantic cache.
+     *
+     * @param queryVector The embedding of the user's query.
+     * @param answer      The generated answer to store.
+     */
+    public void addToCache(float[] queryVector, AnswerDTO answer) {
+        // To prevent the cache from growing indefinitely in a real app, you'd add an eviction policy.
+        // For this demo, we'll just keep it simple.
+        semanticCache.put(queryVector, answer);
     }
 
-    public Object get(String key) {
-        return cache.getIfPresent(key);
-    }
-
-    public void invalidate(String key) {
-        cache.invalidate(key);
+    private double calculateCosineSimilarity(float[] vectorA, float[] vectorB) {
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0; i < vectorA.length; i++) {
+            dotProduct += vectorA[i] * vectorB[i];
+            normA += Math.pow(vectorA[i], 2);
+            normB += Math.pow(vectorB[i], 2);
+        }
+        if (normA == 0 || normB == 0) {
+            return 0.0;
+        }
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 }

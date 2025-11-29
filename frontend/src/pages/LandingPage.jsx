@@ -20,6 +20,10 @@ const LandingPage = () => {
                 throw new Error('Failed to create a new client. Please try again.');
             }
             const data = await response.json();
+
+            // Store keys in sessionStorage to persist across reloads
+            sessionStorage.setItem('docuChatSession', JSON.stringify(data));
+
             // Redirect to the admin page with the new keys in the URL state
             navigate('/admin', { state: { ...data } });
         } catch (err) {

@@ -1,32 +1,39 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../styles/TestClientPage.css';
 
 const API_BASE_URL = 'https://icas00-docchat.hf.space';
 
 const TestClientPage = () => {
-    const { state } = useLocation();
+    const { state: locationState } = useLocation();
     const navigate = useNavigate();
     const scriptRef = useRef(null);
+    const [appState, setAppState] = useState(null);
 
     useEffect(() => {
-        const apiKey = state?.apiKey;
-        const adminKey = state?.adminKey;
-
-        if (!apiKey || !adminKey) {
-            navigate('/');
-            return;
+        const sessionData = sessionStorage.getItem('docuChatSession');
+        let session = null;
+        if (sessionData) {
+            session = JSON.parse(sessionData);
+        } else if (locationState) {
+            session = locationState;
+            sessionStorage.setItem('docuChatSession', JSON.stringify(locationState));
         }
 
-        if (!document.getElementById('docuchat-widget-script')) {
-            const script = document.createElement('script');
-            script.id = 'docuchat-widget-script';
-            script.src = `${API_BASE_URL}/widget.js`;
-            script.setAttribute('data-api-key', apiKey);
-            script.defer = true;
-            
-            document.body.appendChild(script);
-            scriptRef.current = script;
+        if (session?.apiKey) {
+            setAppState(session);
+            if (!document.getElementById('docuchat-widget-script')) {
+                const script = document.createElement('script');
+                script.id = 'docuchat-widget-script';
+                script.src = `${API_BASE_URL}/widget.js`;
+                script.setAttribute('data-api-key', session.apiKey);
+                script.defer = true;
+                
+                document.body.appendChild(script);
+                scriptRef.current = script;
+            }
+        } else {
+            navigate('/');
         }
 
         return () => {
@@ -39,7 +46,11 @@ const TestClientPage = () => {
                 hostElement.parentNode.removeChild(hostElement);
             }
         };
-    }, [state, navigate]);
+    }, [locationState, navigate]);
+
+    if (!appState) {
+        return <div className="test-client-container"><h1>Loading...</h1></div>;
+    }
 
     return (
         <div className="test-client-container">
@@ -54,7 +65,7 @@ const TestClientPage = () => {
                 </div>
 
                 <div className="nav-link">
-                    <Link to="/admin" state={{ ...state }}>&larr; Back to Admin Dashboard</Link>
+                    <Link to="/admin" state={appState}>&larr; Back to Admin Dashboard</Link>
                 </div>
             </div>
         </div>
