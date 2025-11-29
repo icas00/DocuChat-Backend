@@ -10,6 +10,6 @@ public interface FaqDocRepository extends JpaRepository<FaqDoc, Long> {
     // Get all FAQ documents for a specific client.
     List<FaqDoc> findByClientId(Long clientId);
 
-    // Delete all documents for a specific client.
-    void deleteByClient(Client client);
+    // Delete all documents for a specific client and return the number of deleted rows.
+    long deleteByClient(Client client);
 }

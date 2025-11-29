@@ -1,5 +1,6 @@
 package com.aiassistant.controller;
 
+import com.aiassistant.dto.ApiResponse;
 import com.aiassistant.service.ClientService;
 import com.aiassistant.service.EmbeddingService;
 import org.slf4j.Logger;
@@ -31,14 +32,14 @@ public class ClientController {
     }
 
     @PostMapping(value = "/{clientId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> uploadDocument(
+    public ResponseEntity<ApiResponse> uploadDocument(
             @PathVariable Long clientId,
             @RequestParam("file") MultipartFile file) {
 
         logger.info("Received file upload for Client ID: {}", clientId);
 
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File is empty");
+            return ResponseEntity.badRequest().body(new ApiResponse("File is empty"));
         }
 
         try {
@@ -50,25 +51,30 @@ public class ClientController {
             logger.info("File parsed successfully. Size: {} chars", content.length());
             clientService.saveDocument(clientId, file.getOriginalFilename(), content);
             
-            return ResponseEntity.ok("Document uploaded successfully. Please trigger indexing next.");
+            return ResponseEntity.ok(new ApiResponse("Document uploaded successfully. Please trigger indexing next."));
 
         } catch (IOException e) {
             logger.error("Failed to read file", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing file");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse("Error processing file"));
         }
     }
 
     @PostMapping("/{clientId}/index")
-    public ResponseEntity<String> indexDocuments(@PathVariable Long clientId) {
+    public ResponseEntity<ApiResponse> indexDocuments(@PathVariable Long clientId) {
         logger.info("Triggering Indexing for Client ID: {}", clientId);
         embeddingService.indexClientDocs(clientId);
-        return ResponseEntity.ok("Indexing completed for client " + clientId);
+        return ResponseEntity.ok(new ApiResponse("Indexing completed for client " + clientId));
     }
 
     @DeleteMapping("/{clientId}/data")
-    public ResponseEntity<String> clearClientData(@PathVariable Long clientId) {
+    public ResponseEntity<ApiResponse> clearClientData(@PathVariable Long clientId) {
         logger.info("Clearing all data for Client ID: {}", clientId);
-        clientService.clearAllData(clientId);
-        return ResponseEntity.ok("All data cleared for client " + clientId);
+        try {
+            long count = clientService.clearAllData(clientId);
+            return ResponseEntity.ok(new ApiResponse(String.format("Successfully deleted %d document(s).", count)));
+        } catch (Exception e) {
+            logger.error("Error clearing data for client ID: {}", clientId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(e.getMessage()));
+        }
     }
 }

@@ -265,7 +265,7 @@
         indexStatus.textContent = '';
         indexStatus.classList.remove('error', 'processing');
         clearDataStatus.textContent = '';
-        clearDataStatus.classList.remove('error');
+        clearDataStatus.classList.remove('error', 'processing');
         testChatLink.style.display = 'none';
         if (statusInterval) clearInterval(statusInterval);
     }
@@ -357,7 +357,8 @@
             return;
         }
 
-        clearDataStatus.textContent = 'Deleting data...';
+        resetStates();
+        setDynamicStatus(clearDataStatus, 'Deleting data');
         clearDataBtn.disabled = true;
 
         try {
@@ -366,18 +367,20 @@
                 headers: { 'X-Admin-Key': 'demo-secret-key' }
             });
 
+            const result = await response.json();
+
             if (response.ok) {
-                clearDataStatus.textContent = '✅ All data has been cleared.';
-                resetStates();
+                clearDataStatus.textContent = `✅ ${result.message}`;
                 fileNameDisplay.textContent = 'or drag and drop it here';
             } else {
-                const errorText = await response.text();
-                throw new Error(`Failed to clear data: ${errorText}`);
+                throw new Error(result.message || 'Failed to clear data');
             }
         } catch (error) {
             clearDataStatus.textContent = `❌ ${error.message}`;
             clearDataStatus.classList.add('error');
         } finally {
+            if (statusInterval) clearInterval(statusInterval);
+            clearDataStatus.classList.remove('processing');
             clearDataBtn.disabled = false;
         }
     });

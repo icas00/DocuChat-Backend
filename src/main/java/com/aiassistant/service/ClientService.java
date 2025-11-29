@@ -41,9 +41,9 @@ public class ClientService {
     }
 
     @Transactional
-    public void clearAllData(Long clientId) {
+    public long clearAllData(Long clientId) {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
-        faqDocRepository.deleteByClient(client);
+        return faqDocRepository.deleteByClient(client);
     }
 }
