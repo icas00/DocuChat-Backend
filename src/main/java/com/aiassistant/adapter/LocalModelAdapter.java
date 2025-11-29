@@ -3,10 +3,8 @@ package com.aiassistant.adapter;
 import com.aiassistant.dto.AnswerDTO;
 import com.aiassistant.model.FaqDoc;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 
@@ -15,23 +13,30 @@ import java.util.List;
 @ConditionalOnProperty(name = "model.adapter", havingValue = "local")
 public class LocalModelAdapter implements ModelAdapter {
 
-    @Value("${model.local.inference-url}")
-    private String inferenceUrl;
-    
-    @Value("${model.local.embedding-url}")
-    private String embeddingUrl;
-
-    private final WebClient webClient = WebClient.builder().build();
-
     @Override
     public AnswerDTO generateAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs, List<String> history) {
-        log.info("Using local inference at: {}", inferenceUrl);
-        throw new UnsupportedOperationException("Local adapter needs manual setup - check README.");
+        log.warn("LocalModelAdapter is active. It will return a dummy response.");
+        String combinedDocs = relevantDocs.stream()
+                .map(FaqDoc::getAnswer)
+                .reduce("", (a, b) -> a + "\n" + b);
+        
+        String responseText = "This is a dummy response from the local adapter. " +
+                              "Based on the documents, the answer might be related to: " + combinedDocs;
+        
+        return new AnswerDTO(responseText, List.of("Local Source"), 0.5);
+    }
+
+    @Override
+    public AnswerDTO generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
+        log.warn("LocalModelAdapter is active. Using fallback response.");
+        String responseText = "This is a dummy fallback response. I could not find any relevant documents.";
+        return new AnswerDTO(responseText, List.of(), 0.0);
     }
 
     @Override
     public float[] generateEmbedding(String text) {
-        log.info("Using local embeddings at: {}", embeddingUrl);
-        throw new UnsupportedOperationException("Local adapter needs manual setup - check README.");
+        log.warn("LocalModelAdapter is active. It will return a dummy embedding vector.");
+        // Return a fixed-size array of zeros as a placeholder.
+        return new float[768];
     }
 }
