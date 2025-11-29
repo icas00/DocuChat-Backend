@@ -43,7 +43,18 @@ public class ChatService {
         log.info("Semantic cache miss for query: '{}'", message);
 
         List<FaqDoc> relevantDocs = embeddingService.findRelevantDocs(client.getId(), queryVector, TOP_K_DOCS);
-        AnswerDTO generatedAnswer = modelAdapter.generateAnswer(client.getId(), message, relevantDocs, history);
+        
+        AnswerDTO generatedAnswer;
+
+        if (relevantDocs.isEmpty()) {
+            // Retrieval Failure: No relevant documents found.
+            // Use a special prompt to allow for a graceful fallback.
+            log.warn("No relevant documents found for query: '{}'. Using fallback prompt.", message);
+            generatedAnswer = modelAdapter.generateAnswerWithFallback(client.getId(), message, history);
+        } else {
+            // Standard RAG: Documents found.
+            generatedAnswer = modelAdapter.generateAnswer(client.getId(), message, relevantDocs, history);
+        }
 
         cacheService.addToCache(queryVector, generatedAnswer);
 

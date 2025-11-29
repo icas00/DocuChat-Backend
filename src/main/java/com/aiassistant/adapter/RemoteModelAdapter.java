@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,21 +22,41 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RemoteModelAdapter implements ModelAdapter {
 
-    private final WebClient.Builder webClientBuilder;
+    private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final ModelProviderProperties properties;
 
+    // The primary system prompt for when knowledge base articles are found.
+    private static final String STANDARD_SYSTEM_PROMPT = 
+        "You are 'AI Assistant', a helpful and factual customer support agent. " +
+        "Your primary goal is to answer the user's question based *only* on the provided KNOWLEDGE BASE. " +
+        "If the KNOWLEDGE BASE contains the answer, provide it clearly and concisely. " +
+        "If the KNOWLEDGE BASE does NOT contain the answer, you MUST state: 'I'm sorry, I don't have that information.' " +
+        "If the user asks you to perform a calculation or a task you cannot do (like calculating pay), you MUST politely decline and state that you can only answer questions based on the provided text. " +
+        "Do not invent information. Do not refer to yourself as an AI or mention the knowledge base directly in your answer.";
+
+    // The fallback system prompt for when NO relevant articles are found in the knowledge base.
+    private static final String FALLBACK_SYSTEM_PROMPT = 
+        "You are 'AI Assistant', a helpful customer support agent. " +
+        "You have been asked a question for which you have NO information in your knowledge base. " +
+        "Your task is to be helpful and manage the user's expectations without making up an answer. " +
+        "Politely state that you don't have the specific information they are looking for. " +
+        "If appropriate, suggest a more general topic they could ask about, or apologize for the inconvenience. " +
+        "DO NOT invent an answer. Example: 'I'm sorry, I don't have specific details about that. I can answer questions about topics like membership, billing, and facility hours.'";
+
     @Override
     public AnswerDTO generateAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs, List<String> history) {
-        // Adjusted system prompt for better follow-up handling and helpfulness
-        String systemPrompt = "You are 'AI Assistant', a helpful and factual customer support agent. " +
-            "Your primary goal is to answer the user's question based *only* on the provided KNOWLEDGE BASE. " +
-            "If the KNOWLEDGE BASE contains the answer, provide it clearly and concisely. " +
-            "If the KNOWLEDGE BASE does NOT contain the answer, you MUST state: 'I'm sorry, I don't have that information.' " +
-            "You can use the conversation history to understand follow-up questions, but your answers must still be derived from the KNOWLEDGE BASE. " +
-            "Do not invent information. Do not refer to yourself as an AI or mention the knowledge base directly in your answer.";
-
         String userPrompt = buildUserPrompt(prompt, relevantDocs);
+        return callChatApi(STANDARD_SYSTEM_PROMPT, userPrompt, history, relevantDocs);
+    }
+
+    @Override
+    public AnswerDTO generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
+        // No knowledge base is provided, so the user prompt is just the user's question.
+        return callChatApi(FALLBACK_SYSTEM_PROMPT, prompt, history, List.of());
+    }
+
+    private AnswerDTO callChatApi(String systemPrompt, String userPrompt, List<String> history, List<FaqDoc> relevantDocs) {
         List<Map<String, String>> messages = buildMessageHistory(systemPrompt, userPrompt, history);
         
         Map<String, Object> requestBody = Map.of(
@@ -46,7 +65,7 @@ public class RemoteModelAdapter implements ModelAdapter {
         );
 
         try {
-            String jsonResponse = webClientBuilder.build().post()
+            String jsonResponse = webClient.post()
                     .uri(properties.getChat().getEndpoint())
                     .header("Authorization", "Bearer " + properties.getChat().getKey())
                     .header("Content-Type", "application/json")
@@ -73,7 +92,7 @@ public class RemoteModelAdapter implements ModelAdapter {
         );
 
         try {
-            String jsonResponse = webClientBuilder.build().post()
+            String jsonResponse = webClient.post()
                     .uri(properties.getEmbedding().getEndpoint())
                     .header("Authorization", "Bearer " + properties.getEmbedding().getKey())
                     .header("Content-Type", "application/json")
@@ -90,13 +109,13 @@ public class RemoteModelAdapter implements ModelAdapter {
 
     private String buildUserPrompt(String query, List<FaqDoc> docs) {
         StringBuilder sb = new StringBuilder();
+        sb.append("--- KNOWLEDGE BASE ---\n");
         if (docs != null && !docs.isEmpty()) {
-            sb.append("--- KNOWLEDGE BASE ---\n");
             for (FaqDoc doc : docs) {
                 sb.append(doc.getAnswer()).append("\n\n");
             }
         } else {
-            sb.append("--- KNOWLEDGE BASE ---\n[No relevant information found]\n");
+            sb.append("[No relevant information found]\n");
         }
         sb.append("\n--- USER'S QUESTION ---\n").append(query);
         return sb.toString();
