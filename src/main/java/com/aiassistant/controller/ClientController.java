@@ -64,4 +64,11 @@ public class ClientController {
         embeddingService.indexClientDocs(clientId);
         return ResponseEntity.ok("Indexing completed for client " + clientId);
     }
+
+    @DeleteMapping("/{clientId}/data")
+    public ResponseEntity<String> clearClientData(@PathVariable Long clientId) {
+        logger.info("Clearing all data for Client ID: {}", clientId);
+        clientService.clearAllData(clientId);
+        return ResponseEntity.ok("All data cleared for client " + clientId);
+    }
 }
