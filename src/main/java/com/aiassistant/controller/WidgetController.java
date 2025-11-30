@@ -23,7 +23,7 @@ public class WidgetController {
     private final ChatService chatService;
     private final ClientService clientService;
 
-    @PostMapping(value = "/stream-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/stream-chat", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public Flux<String> streamChat(@RequestBody WidgetRequest request) {
         try {
             return chatService.processStreamingMessage(request.getApiKey(), request.getMessage(), request.getHistory());
