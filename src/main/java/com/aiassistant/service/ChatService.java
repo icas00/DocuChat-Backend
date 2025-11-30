@@ -1,7 +1,6 @@
 package com.aiassistant.service;
 
 import com.aiassistant.adapter.ModelAdapter;
-import com.aiassistant.dto.AnswerDTO;
 import com.aiassistant.model.FaqDoc;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,9 +44,7 @@ public class ChatService {
 
                                 if (relevantDocs.isEmpty()) {
                                     log.warn("No relevant documents found for query: '{}'. Using fallback.", message);
-                                    return modelAdapter.generateAnswerWithFallback(client.getId(), message, history)
-                                            .map(AnswerDTO::getText)
-                                            .flux();
+                                    return modelAdapter.generateAnswerWithFallback(client.getId(), message, history);
                                 }
 
                                 return modelAdapter.generateStreamingAnswer(client.getId(), message, relevantDocs,

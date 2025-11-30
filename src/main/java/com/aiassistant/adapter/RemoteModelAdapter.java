@@ -72,10 +72,14 @@ public class RemoteModelAdapter implements ModelAdapter {
     }
 
     @Override
-    public Mono<AnswerDTO> generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
+    public Flux<String> generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
         log.info("Generating fallback answer for client: {}", clientId);
         List<Map<String, String>> messages = buildMessageHistory(fallbackSystemPrompt, prompt, history);
-        Map<String, Object> requestBody = Map.of("model", properties.getChat().getModel(), "messages", messages);
+
+        Map<String, Object> requestBody = Map.of(
+                "model", properties.getChat().getModel(),
+                "messages", messages,
+                "stream", true);
 
         return webClient.post()
                 .uri(properties.getChat().getEndpoint())
@@ -83,13 +87,19 @@ public class RemoteModelAdapter implements ModelAdapter {
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToMono(String.class)
-                .map(this::extractAnswerFromResponse)
-                .map(text -> new AnswerDTO(text, List.of(), 0.0))
-                .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofSeconds(retryBackoffSeconds)))
+                .bodyToFlux(String.class)
+                .map(this::extractTextFromStreamChunk)
+                .filter(text -> !text.isEmpty())
+                .doOnSubscribe(s -> log.info("Fallback stream subscribed for client: {}", clientId))
+                .doOnNext(s -> log.debug("Sending fallback text chunk: {}", s))
+                .doOnError(e -> log.error("Error in fallback streaming answer for client: {}", clientId, e))
+                .doOnComplete(() -> log.info("Fallback stream completed for client: {}", clientId))
+                .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofSeconds(retryBackoffSeconds))
+                        .filter(throwable -> throwable instanceof Exception))
                 .onErrorResume(e -> {
                     log.error("Error calling chat API for fallback", e);
-                    return Mono.just(new AnswerDTO("Error generating fallback answer.", List.of(), 0.0));
+                    return Flux.just(
+                            "I apologize, but I'm having trouble generating a response right now. Please try again later.");
                 });
     }
 

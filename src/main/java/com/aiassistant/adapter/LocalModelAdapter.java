@@ -24,10 +24,10 @@ public class LocalModelAdapter implements ModelAdapter {
     }
 
     @Override
-    public Mono<AnswerDTO> generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
+    public Flux<String> generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
         log.warn("LocalModelAdapter is active. Using fallback response.");
         String responseText = "This is a dummy fallback response. I could not find any relevant documents.";
-        return Mono.just(new AnswerDTO(responseText, List.of(), 0.0));
+        return Flux.just(responseText);
     }
 
     @Override
