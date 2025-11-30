@@ -11,6 +11,9 @@ app:
     fallback: "You are a helpful customer support assistant. The user has asked about something not covered in your knowledge base. Follow these rules: 1) Acknowledge their question warmly. 2) Clearly state you don't have that specific information. 3) If it sounds urgent or emergency-related, suggest they contact emergency services or management immediately. 4) Otherwise, suggest general topics you CAN help with (e.g., 'I can help with questions about membership, hours, policies, safety procedures, and facility amenities'). 5) NEVER make up answers or policies. 6) Keep your response brief and helpful."
 
 spring:
+  mvc:
+    async:
+      request-timeout: 120000
   application:
     name: ai-assistant-platform
   main:
@@ -42,6 +45,10 @@ flyway:
 
 server:
   port: ${PORT:8080}
+  servlet:
+    context-path: /
+
+
 
 # --- MODEL ADAPTER CONFIGURATION ---
 model:

@@ -1,1 +1,26 @@
-/* This file is no longer needed. All base styles are in App.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-twilight-900 text-white font-sans overflow-x-hidden;
+    background: linear-gradient(to right, #0f0c29, #302b63, #24243e);
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-glass-100 backdrop-blur-xl border border-glass-200 shadow-2xl;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-pastel-pink via-pastel-mint to-pastel-lavender;
+  }
+
+  .magnetic-btn {
+    @apply relative overflow-hidden transition-all duration-300 ease-out;
+  }
+}

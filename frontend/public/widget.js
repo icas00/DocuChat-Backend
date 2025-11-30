@@ -6,7 +6,8 @@
     }
 
     const apiKey = scriptTag.getAttribute('data-api-key');
-    const backendUrl = new URL(scriptTag.src).origin;
+    // HARDCODED BACKEND URL FOR TESTING FRONTEND CHANGES
+    const backendUrl = 'https://icas00-docchat.hf.space';
 
     if (!apiKey) {
         console.error("DocuChat: Missing data-api-key attribute. Widget will not load.");
