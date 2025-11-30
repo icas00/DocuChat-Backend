@@ -22,9 +22,10 @@ const TestClientPage = () => {
 
         if (session?.apiKey) {
             setAppState(session);
+            // Ensure we don't add the script multiple times on re-renders
             if (!document.getElementById('docuchat-widget-script')) {
                 const script = document.createElement('script');
-                script.id = 'docuchat-widget-script';
+                script.id = 'docuchat-widget-script'; // Give the script a unique ID
                 script.src = `${API_BASE_URL}/widget.js`;
                 script.setAttribute('data-api-key', session.apiKey);
                 script.defer = true;
@@ -36,6 +37,7 @@ const TestClientPage = () => {
             navigate('/');
         }
 
+        // Cleanup function to remove the script and its host element when the component unmounts
         return () => {
             const scriptElement = scriptRef.current;
             const hostElement = document.getElementById('docuchat-widget-host');

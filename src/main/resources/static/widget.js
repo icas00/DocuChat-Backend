@@ -1,16 +1,15 @@
 (function() {
-    const scriptTag = document.currentScript;
+    const scriptTag = document.getElementById('docuchat-widget-script');
     if (!scriptTag) {
-        console.error("DocuChat: Cannot find current script tag.");
+        console.error("DocuChat: Critical error - Cannot find the widget script tag.");
         return;
     }
 
     const apiKey = scriptTag.getAttribute('data-api-key');
-    const scriptSrc = new URL(scriptTag.src);
-    const backendUrl = scriptSrc.origin;
+    const backendUrl = new URL(scriptTag.src).origin;
 
     if (!apiKey) {
-        console.error("DocuChat: Missing data-api-key attribute.");
+        console.error("DocuChat: Missing data-api-key attribute. Widget will not load.");
         return;
     }
 
@@ -61,6 +60,7 @@
                 .docu-msg {
                     max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.4;
                     position: relative;
+                    word-wrap: break-word;
                 }
                 .docu-msg.bot { background: white; border: 1px solid #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; color: #333; }
                 .docu-msg.user { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
@@ -130,25 +130,46 @@
                     body: JSON.stringify({ apiKey: apiKey, message: text, history: chatHistory })
                 });
 
-                if (!response.body) throw new Error("Streaming not supported.");
+                if (!response.body) throw new Error("Streaming not supported by the browser.");
+                if (!response.ok) throw new Error(`Network error: ${response.status} ${response.statusText}`);
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
                     
-                    const chunk = decoder.decode(value);
-                    fullBotResponse += chunk;
-                    botMessageElement.innerText = fullBotResponse;
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep the last, potentially incomplete line
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6);
+                            if (data.trim() === '[DONE]') {
+                                continue;
+                            }
+                            try {
+                                const parsed = JSON.parse(data);
+                                const content = parsed.choices[0]?.delta?.content;
+                                if (content) {
+                                    fullBotResponse += content;
+                                    botMessageElement.innerText = fullBotResponse;
+                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error("Error parsing stream data:", data, e);
+                            }
+                        }
+                    }
                 }
                 
                 chatHistory.push('Assistant: ' + fullBotResponse);
 
             } catch(e) {
-                botMessageElement.innerText = "Sorry, I'm having trouble connecting.";
+                botMessageElement.innerText = `Sorry, an error occurred: ${e.message}`;
             } finally {
                 input.disabled = false;
                 sendButton.disabled = false;

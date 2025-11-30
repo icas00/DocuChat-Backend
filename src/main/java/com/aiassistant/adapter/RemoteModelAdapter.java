@@ -54,14 +54,14 @@ public class RemoteModelAdapter implements ModelAdapter {
             "stream", true
         );
 
+        // Act as a simple proxy: forward the raw stream from the provider directly to the client.
         return webClient.post()
                 .uri(properties.getChat().getEndpoint())
                 .header("Authorization", "Bearer " + properties.getChat().getKey())
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToFlux(String.class)
-                .mapNotNull(this::extractContentFromStream);
+                .bodyToFlux(String.class);
     }
 
     @Override
@@ -140,32 +140,12 @@ public class RemoteModelAdapter implements ModelAdapter {
     }
 
     private String extractAnswerFromResponse(String jsonResponse) throws Exception {
-        String cleanJson = jsonResponse.substring(jsonResponse.indexOf('{'));
-        JsonNode root = objectMapper.readTree(cleanJson);
+        JsonNode root = objectMapper.readTree(jsonResponse);
         return root.path("choices").get(0).path("message").path("content").asText("Sorry, I could not process the response.");
-    }
-    
-    private String extractContentFromStream(String sseEvent) {
-        if (sseEvent.startsWith("data: ")) {
-            String data = sseEvent.substring(6);
-            if (data.trim().equals("[DONE]")) {
-                return null;
-            }
-            try {
-                JsonNode root = objectMapper.readTree(data);
-                JsonNode contentNode = root.path("choices").get(0).path("delta").path("content");
-                return contentNode.isMissingNode() ? null : contentNode.asText();
-            } catch (Exception e) {
-                log.error("Error parsing stream event: {}", sseEvent, e);
-                return null;
-            }
-        }
-        return null;
     }
 
     private float[] extractOpenAIEmbedding(String jsonResponse) throws Exception {
-        String cleanJson = jsonResponse.substring(jsonResponse.indexOf('{'));
-        JsonNode root = objectMapper.readTree(cleanJson);
+        JsonNode root = objectMapper.readTree(jsonResponse);
         JsonNode embeddingNode = root.path("data").get(0).path("embedding");
         
         if (embeddingNode.isMissingNode() || !embeddingNode.isArray()) {
