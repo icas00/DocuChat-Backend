@@ -61,8 +61,10 @@ public class RemoteModelAdapter implements ModelAdapter {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
+                .map(this::extractTextFromStreamChunk)
+                .filter(text -> !text.isEmpty())
                 .doOnSubscribe(s -> log.info("Stream subscribed for client: {}", clientId))
-                .doOnNext(s -> log.debug("Received chunk for client: {}", clientId))
+                .doOnNext(s -> log.debug("Sending text chunk: {}", s))
                 .doOnError(e -> log.error("Error in streaming answer for client: {}", clientId, e))
                 .doOnComplete(() -> log.info("Stream completed for client: {}", clientId))
                 .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofSeconds(retryBackoffSeconds))
@@ -172,6 +174,25 @@ public class RemoteModelAdapter implements ModelAdapter {
             return vector;
         } catch (Exception e) {
             throw new RuntimeException("Error parsing embedding", e);
+        }
+    }
+
+    private String extractTextFromStreamChunk(String chunk) {
+        try {
+            if (chunk.startsWith("data: ")) {
+                String jsonPart = chunk.substring(6).trim();
+                if (jsonPart.equals("[DONE]")) {
+                    return "";
+                }
+                JsonNode root = objectMapper.readTree(jsonPart);
+                String content = root.path("choices").get(0)
+                        .path("delta").path("content").asText("");
+                return content;
+            }
+            return "";
+        } catch (Exception e) {
+            log.warn("Failed to parse stream chunk: {}", chunk, e);
+            return "";
         }
     }
 }

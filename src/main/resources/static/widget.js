@@ -136,7 +136,6 @@
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let buffer = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -145,34 +144,15 @@
                         break;
                     }
 
-                    buffer += decoder.decode(value, { stream: true });
-
-                    let newlineIndex;
-                    while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
-                        const line = buffer.slice(0, newlineIndex).trim();
-                        buffer = buffer.slice(newlineIndex + 1);
-
-                        if (line.startsWith('data:')) {
-                            const data = line.substring(5).trim();
-                            if (data === '[DONE]') {
-                                continue;
-                            }
-                            try {
-                                const parsed = JSON.parse(data);
-                                const content = parsed.choices[0]?.delta?.content;
-                                if (content) {
-                                    fullBotResponse += content;
-                                    botMessageElement.innerText = fullBotResponse + '▋';
-                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                }
-                            } catch (e) {
-                                console.error("DocuChat: Error parsing stream JSON:", data, e);
-                            }
-                        }
+                    const chunk = decoder.decode(value, { stream: true });
+                    if (chunk) {
+                        fullBotResponse += chunk;
+                        botMessageElement.innerText = fullBotResponse + '▋';
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     }
                 }
 
-                botMessageElement.innerText = fullBotResponse; // Final cleanup
+                botMessageElement.innerText = fullBotResponse;
                 chatHistory.push('Assistant: ' + fullBotResponse);
 
             } catch (e) {
