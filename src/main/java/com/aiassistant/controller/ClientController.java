@@ -20,9 +20,11 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 
+import reactor.core.publisher.Mono;
+
 @RestController
 @RequestMapping("/api/clients")
-@CrossOrigin(origins = "*") 
+@CrossOrigin(origins = "*")
 public class ClientController {
 
     private static final Logger logger = LoggerFactory.getLogger(ClientController.class);
@@ -38,10 +40,9 @@ public class ClientController {
     public ResponseEntity<CreateClientResponse> createClient() {
         Client client = clientService.createClient("New Client");
         CreateClientResponse response = new CreateClientResponse(
-            client.getId(),
-            client.getApiKey(),
-            client.getAdminKey()
-        );
+                client.getId(),
+                client.getApiKey(),
+                client.getAdminKey());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -64,20 +65,21 @@ public class ClientController {
 
             logger.info("File parsed successfully. Size: {} chars", content.length());
             clientService.saveDocument(clientId, file.getOriginalFilename(), content);
-            
+
             return ResponseEntity.ok(new ApiResponse("Document uploaded successfully. Please trigger indexing next."));
 
         } catch (IOException e) {
             logger.error("Failed to read file", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse("Error processing file"));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse("Error processing file"));
         }
     }
 
     @PostMapping("/{clientId}/index")
-    public ResponseEntity<ApiResponse> indexDocuments(@PathVariable Long clientId) {
+    public Mono<ResponseEntity<ApiResponse>> indexDocuments(@PathVariable Long clientId) {
         logger.info("Triggering Indexing for Client ID: {}", clientId);
-        embeddingService.indexClientDocs(clientId);
-        return ResponseEntity.ok(new ApiResponse("Indexing completed for client " + clientId));
+        return embeddingService.indexClientDocs(clientId)
+                .then(Mono.just(ResponseEntity.ok(new ApiResponse("Indexing started for client " + clientId))));
     }
 
     @DeleteMapping("/{clientId}/data")

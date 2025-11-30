@@ -61,6 +61,7 @@
                     max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.4;
                     position: relative;
                     word-wrap: break-word;
+                    white-space: pre-wrap;
                 }
                 .docu-msg.bot { background: white; border: 1px solid #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; color: #333; }
                 .docu-msg.user { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
@@ -120,7 +121,7 @@
             input.disabled = true;
             sendButton.disabled = true;
 
-            const botMessageElement = addMessage('', 'bot');
+            const botMessageElement = addMessage('▋', 'bot');
             let fullBotResponse = '';
 
             try {
@@ -139,16 +140,21 @@
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        console.log("DocuChat: Stream finished.");
+                        break;
+                    }
                     
                     buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop(); // Keep the last, potentially incomplete line
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = line.substring(6);
-                            if (data.trim() === '[DONE]') {
+                    
+                    let newlineIndex;
+                    while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+                        const line = buffer.slice(0, newlineIndex).trim();
+                        buffer = buffer.slice(newlineIndex + 1);
+                        
+                        if (line.startsWith('data:')) {
+                            const data = line.substring(5).trim();
+                            if (data === '[DONE]') {
                                 continue;
                             }
                             try {
@@ -156,20 +162,22 @@
                                 const content = parsed.choices[0]?.delta?.content;
                                 if (content) {
                                     fullBotResponse += content;
-                                    botMessageElement.innerText = fullBotResponse;
+                                    botMessageElement.innerText = fullBotResponse + '▋';
                                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                                 }
                             } catch (e) {
-                                console.error("Error parsing stream data:", data, e);
+                                console.error("DocuChat: Error parsing stream JSON:", data, e);
                             }
                         }
                     }
                 }
                 
+                botMessageElement.innerText = fullBotResponse; // Final cleanup
                 chatHistory.push('Assistant: ' + fullBotResponse);
 
             } catch(e) {
                 botMessageElement.innerText = `Sorry, an error occurred: ${e.message}`;
+                console.error("DocuChat: Fetch stream error:", e);
             } finally {
                 input.disabled = false;
                 sendButton.disabled = false;

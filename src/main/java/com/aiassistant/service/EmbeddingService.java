@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,42 +28,42 @@ public class EmbeddingService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public void indexClientDocs(Long clientId) {
-        log.info("Starting indexing for client ID: {}", clientId);
-        
-        embeddingRepository.deleteAll(embeddingRepository.findByDocClientId(clientId));
-        log.info("Cleared old embeddings for client.");
-
-        List<FaqDoc> allDocuments = faqDocRepository.findByClientId(clientId);
-
-        if (allDocuments.isEmpty()) {
-            log.warn("No documents found to index for client ID: {}", clientId);
-            return;
-        }
-
-        log.info("Found {} documents. Indexing one by one...", allDocuments.size());
-
-        for (FaqDoc doc : allDocuments) {
-            try {
-                String textToEmbed = doc.getAnswer();
-                float[] vector = modelAdapter.generateEmbedding(textToEmbed);
-
-                if (vector == null || vector.length == 0) {
-                    log.error("Failed to generate embedding for doc ID: {}. Skipping.", doc.getId());
-                    continue; 
-                }
-
-                Embedding embedding = new Embedding();
-                embedding.setDoc(doc);
-                embedding.setVectorData(objectMapper.writeValueAsString(vector));
-                embeddingRepository.save(embedding);
-                log.info("Successfully indexed doc ID: {}", doc.getId());
-
-            } catch (Exception e) {
-                log.error("An unexpected error occurred while indexing doc ID: {}. Error: {}", doc.getId(), e.getMessage());
-            }
-        }
-        log.info("Indexing Process Finished.");
+    public Mono<Void> indexClientDocs(Long clientId) {
+        return Mono.fromRunnable(() -> {
+            log.info("Starting indexing for client ID: {}", clientId);
+            embeddingRepository.deleteAll(embeddingRepository.findByDocClientId(clientId));
+            log.info("Cleared old embeddings for client.");
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .then(Mono.defer(() -> {
+                    List<FaqDoc> allDocuments = faqDocRepository.findByClientId(clientId);
+                    if (allDocuments.isEmpty()) {
+                        log.warn("No documents found to index for client ID: {}", clientId);
+                        return Mono.empty();
+                    }
+                    log.info("Found {} documents. Indexing...", allDocuments.size());
+                    return Flux.fromIterable(allDocuments)
+                            .flatMap(doc -> modelAdapter.generateEmbedding(doc.getAnswer())
+                                    .map(vector -> {
+                                        try {
+                                            Embedding embedding = new Embedding();
+                                            embedding.setDoc(doc);
+                                            embedding.setVectorData(objectMapper.writeValueAsString(vector));
+                                            return embedding;
+                                        } catch (JsonProcessingException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    })
+                                    .doOnNext(embedding -> {
+                                        embeddingRepository.save(embedding);
+                                        log.info("Successfully indexed doc ID: {}", doc.getId());
+                                    })
+                                    .onErrorResume(e -> {
+                                        log.error("Error indexing doc ID: {}", doc.getId(), e);
+                                        return Mono.empty();
+                                    }))
+                            .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                            .then();
+                }));
     }
 
     public List<FaqDoc> findRelevantDocs(Long clientId, float[] queryVector, int k) {
@@ -76,29 +78,30 @@ public class EmbeddingService {
         log.info("Found {} embeddings for client ID: {}", clientEmbeddings.size(), clientId);
 
         return clientEmbeddings.stream()
-            .map(embedding -> {
-                try {
-                    float[] docVector = objectMapper.readValue(embedding.getVectorData(), float[].class);
-                    double similarity = cosineSimilarity(queryVector, docVector);
-                    return new DocScore(embedding.getDoc(), similarity);
-                } catch (JsonProcessingException e) {
-                    log.error("Failed to parse vector for doc ID: {}. Error: {}", embedding.getDoc().getId(), e.getMessage());
-                    return new DocScore(embedding.getDoc(), 0.0);
-                }
-            })
-            .filter(ds -> ds.score > 0.3)
-            .sorted((a, b) -> Double.compare(b.score, a.score))
-            .limit(k)
-            .map(DocScore::doc)
-            .collect(Collectors.toList());
+                .map(embedding -> {
+                    try {
+                        float[] docVector = objectMapper.readValue(embedding.getVectorData(), float[].class);
+                        double similarity = cosineSimilarity(queryVector, docVector);
+                        return new DocScore(embedding.getDoc(), similarity);
+                    } catch (JsonProcessingException e) {
+                        log.error("Failed to parse vector for doc ID: {}. Error: {}", embedding.getDoc().getId(),
+                                e.getMessage());
+                        return new DocScore(embedding.getDoc(), 0.0);
+                    }
+                })
+                .filter(ds -> ds.score > 0.3)
+                .sorted((a, b) -> Double.compare(b.score, a.score))
+                .limit(k)
+                .map(DocScore::doc)
+                .collect(Collectors.toList());
     }
-    
+
     @Scheduled(fixedRate = 3600000) // 1 hour
     @Transactional
     public void cleanupDemoData() {
         Long demoClientId = 1L;
         log.info("Running scheduled cleanup of demo data for client ID: {}", demoClientId);
-        
+
         List<Embedding> embeddings = embeddingRepository.findByDocClientId(demoClientId);
         if (!embeddings.isEmpty()) {
             embeddingRepository.deleteAll(embeddings);
@@ -110,7 +113,7 @@ public class EmbeddingService {
             faqDocRepository.deleteAll(docs);
             log.info("Deleted {} documents.", docs.size());
         }
-        
+
         log.info("Demo data cleanup finished.");
     }
 
@@ -132,5 +135,6 @@ public class EmbeddingService {
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
-    private record DocScore(FaqDoc doc, double score) {}
+    private record DocScore(FaqDoc doc, double score) {
+    }
 }
