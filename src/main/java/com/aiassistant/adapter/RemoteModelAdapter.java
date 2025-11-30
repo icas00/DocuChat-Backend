@@ -45,6 +45,7 @@ public class RemoteModelAdapter implements ModelAdapter {
     @Override
     public Flux<String> generateStreamingAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs,
             List<String> history) {
+        log.info("Generating streaming answer for client: {}", clientId);
         String userPrompt = buildUserPrompt(prompt, relevantDocs);
         List<Map<String, String>> messages = buildMessageHistory(standardSystemPrompt, userPrompt, history);
 
@@ -60,12 +61,17 @@ public class RemoteModelAdapter implements ModelAdapter {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
+                .doOnSubscribe(s -> log.info("Stream subscribed for client: {}", clientId))
+                .doOnNext(s -> log.debug("Received chunk for client: {}", clientId))
+                .doOnError(e -> log.error("Error in streaming answer for client: {}", clientId, e))
+                .doOnComplete(() -> log.info("Stream completed for client: {}", clientId))
                 .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofSeconds(retryBackoffSeconds))
-                        .filter(throwable -> throwable instanceof Exception)); // Retry on any exception for now
+                        .filter(throwable -> throwable instanceof Exception));
     }
 
     @Override
     public Mono<AnswerDTO> generateAnswerWithFallback(Long clientId, String prompt, List<String> history) {
+        log.info("Generating fallback answer for client: {}", clientId);
         List<Map<String, String>> messages = buildMessageHistory(fallbackSystemPrompt, prompt, history);
         Map<String, Object> requestBody = Map.of("model", properties.getChat().getModel(), "messages", messages);
 
@@ -87,6 +93,7 @@ public class RemoteModelAdapter implements ModelAdapter {
 
     @Override
     public Mono<float[]> generateEmbedding(String text) {
+        log.info("Generating embedding for text length: {}", text.length());
         Map<String, Object> requestBody = Map.of(
                 "input", text,
                 "model", properties.getEmbedding().getModel());
@@ -98,6 +105,7 @@ public class RemoteModelAdapter implements ModelAdapter {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String.class)
+                .doOnSuccess(s -> log.info("Embedding received successfully"))
                 .map(this::extractOpenAIEmbedding)
                 .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofSeconds(retryBackoffSeconds)))
                 .onErrorResume(e -> {

@@ -41,7 +41,7 @@
                 .docu-widget-btn:hover { transform: scale(1.1); }
                 .docu-widget-box {
                     position: fixed; bottom: 120px; right: 40px;
-                    width: 350px; height: 500px;
+                    width: 400px; height: 600px;
                     background: white; border-radius: 20px;
                     box-shadow: 0 20px 50px rgba(0,0,0,0.2);
                     display: none; flex-direction: column;
@@ -50,7 +50,7 @@
                 }
                 .docu-header {
                     background: #0f172a; color: white;
-                    padding: 20px; font-weight: bold;
+                    padding: 20px; font-weight: bold; font-size: 18px;
                     display: flex; align-items: center; gap: 10px;
                 }
                 .docu-messages {
@@ -58,7 +58,7 @@
                     background: #f8fafc; display: flex; flex-direction: column; gap: 10px;
                 }
                 .docu-msg {
-                    max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.4;
+                    max-width: 80%; padding: 12px 16px; border-radius: 14px; font-size: 16px; line-height: 1.5;
                     position: relative;
                     word-wrap: break-word;
                     white-space: pre-wrap;
@@ -69,12 +69,12 @@
                     padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;
                 }
                 .docu-input {
-                    flex: 1; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; font-size: 14px;
+                    flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; font-size: 16px;
                 }
                 .docu-send {
                     background: ${settings.widgetColor};
                     color: white; border: none;
-                    padding: 0 15px; border-radius: 8px; cursor: pointer; font-weight: bold;
+                    padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px;
                 }
             </style>
             
