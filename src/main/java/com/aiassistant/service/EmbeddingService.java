@@ -33,37 +33,39 @@ public class EmbeddingService {
             log.info("Starting indexing for client ID: {}", clientId);
             embeddingRepository.deleteAll(embeddingRepository.findByDocClientId(clientId));
             log.info("Cleared old embeddings for client.");
-        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-                .then(Mono.defer(() -> {
-                    List<FaqDoc> allDocuments = faqDocRepository.findByClientId(clientId);
-                    if (allDocuments.isEmpty()) {
-                        log.warn("No documents found to index for client ID: {}", clientId);
-                        return Mono.empty();
-                    }
-                    log.info("Found {} documents. Indexing...", allDocuments.size());
-                    return Flux.fromIterable(allDocuments)
-                            .flatMap(doc -> modelAdapter.generateEmbedding(doc.getAnswer())
-                                    .map(vector -> {
-                                        try {
-                                            Embedding embedding = new Embedding();
-                                            embedding.setDoc(doc);
-                                            embedding.setVectorData(objectMapper.writeValueAsString(vector));
-                                            return embedding;
-                                        } catch (JsonProcessingException e) {
-                                            throw new RuntimeException(e);
-                                        }
-                                    })
-                                    .doOnNext(embedding -> {
-                                        embeddingRepository.save(embedding);
-                                        log.info("Successfully indexed doc ID: {}", doc.getId());
-                                    })
-                                    .onErrorResume(e -> {
-                                        log.error("Error indexing doc ID: {}", doc.getId(), e);
-                                        return Mono.empty();
-                                    }))
-                            .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-                            .then();
-                }));
+        })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .then(Mono.fromCallable(() -> faqDocRepository.findByClientId(clientId))
+                        .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                        .flatMapMany(allDocuments -> {
+                            if (allDocuments.isEmpty()) {
+                                log.warn("No documents found to index for client ID: {}", clientId);
+                                return Flux.empty();
+                            }
+                            log.info("Found {} documents. Indexing...", allDocuments.size());
+                            return Flux.fromIterable(allDocuments)
+                                    .flatMap(doc -> modelAdapter.generateEmbedding(doc.getAnswer())
+                                            .map(vector -> {
+                                                try {
+                                                    Embedding embedding = new Embedding();
+                                                    embedding.setDoc(doc);
+                                                    embedding.setVectorData(objectMapper.writeValueAsString(vector));
+                                                    return embedding;
+                                                } catch (JsonProcessingException e) {
+                                                    throw new RuntimeException(e);
+                                                }
+                                            })
+                                            .flatMap(embedding -> Mono.fromRunnable(() -> {
+                                                embeddingRepository.save(embedding);
+                                                log.info("Successfully indexed doc ID: {}", doc.getId());
+                                            }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                                                    .then(Mono.just(embedding)))
+                                            .onErrorResume(e -> {
+                                                log.error("Error indexing doc ID: {}", doc.getId(), e);
+                                                return Mono.empty();
+                                            }));
+                        })
+                        .then());
     }
 
     public List<FaqDoc> findRelevantDocs(Long clientId, float[] queryVector, int k) {

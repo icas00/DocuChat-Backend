@@ -2,7 +2,6 @@ package com.aiassistant.service;
 
 import com.aiassistant.adapter.ModelAdapter;
 import com.aiassistant.dto.AnswerDTO;
-import com.aiassistant.adapter.ModelAdapter;
 import com.aiassistant.model.FaqDoc;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

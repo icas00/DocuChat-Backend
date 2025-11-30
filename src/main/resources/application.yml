@@ -26,6 +26,15 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    driverClassName: ${DATABASE_DRIVER:org.h2.Driver}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    database-platform: ${DATABASE_PLATFORM:org.hibernate.dialect.H2Dialect}
+    hibernate:
+      ddl-auto: none
 
 flyway:
   enabled: true
@@ -66,5 +75,3 @@ logging:
     com.aiassistant: DEBUG
     org.springframework.web: INFO
     org.hibernate.SQL: DEBUG
-
-    fallback: "You are 'AI Assistant', a helpful customer support agent. You have been asked a question for which you have NO information in your knowledge base. Your task is to be helpful and manage the user's expectations without making up an answer. Politely state that you don't have the specific information they are looking for. If appropriate, suggest a more general topic they could ask about, or apologize for the inconvenience. DO NOT invent an answer. Example: 'I'm sorry, I don't have specific details about that. I can answer questions about topics like membership, billing, and facility hours.'"
