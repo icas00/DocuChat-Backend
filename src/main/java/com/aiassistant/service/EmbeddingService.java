@@ -45,61 +45,70 @@ public class EmbeddingService {
                             }
                             log.info("Found {} documents. Chunking and indexing...", allDocuments.size());
 
-                            // Chunk each document into semantic units
+                            // 1. Flatten all documents into a stream of chunks with their source document
                             return Flux.fromIterable(allDocuments)
                                     .flatMap(doc -> {
-                                        // Chunk the document text
                                         List<DocumentChunker.DocumentChunk> chunks = documentChunker.chunkDocument(
                                                 doc.getAnswer(),
                                                 doc.getId());
-
-                                        log.info("Document ID {} split into {} chunks", doc.getId(), chunks.size());
-
-                                        // Create embeddings for each chunk
                                         return Flux.fromIterable(chunks)
-                                                .flatMap(chunk -> modelAdapter.generateEmbedding(chunk.getText())
-                                                        .map(vector -> {
-                                                            try {
-                                                                Embedding embedding = new Embedding();
-                                                                embedding.setDoc(doc);
-                                                                // Store in JSON format (backward compatibility)
-                                                                embedding.setVectorData(
-                                                                        objectMapper.writeValueAsString(vector));
-                                                                // Also store in pgvector format for fast similarity
-                                                                // search
-                                                                embedding.setVectorDataPgvector(
-                                                                        vectorToPgVectorString(vector));
-                                                                return embedding;
-                                                            } catch (JsonProcessingException e) {
-                                                                throw new RuntimeException(e);
-                                                            }
-                                                        })
-                                                        .flatMap(embedding -> Mono.fromRunnable(() -> {
-                                                            // Save the embedding (without pgvector field)
-                                                            Embedding savedEmbedding = embeddingRepository
-                                                                    .save(embedding);
+                                                .map(chunk -> new ChunkContext(chunk, doc));
+                                    })
+                                    // 2. Buffer chunks into batches of 50 to reduce API calls
+                                    .buffer(50)
+                                    .flatMap(batch -> {
+                                        List<String> texts = batch.stream()
+                                                .map(ctx -> ctx.chunk().getText())
+                                                .collect(Collectors.toList());
 
-                                                            // Update pgvector column using native SQL with proper
-                                                            // casting
-                                                            if (embedding.getVectorDataPgvector() != null) {
-                                                                embeddingRepository.updatePgVector(
-                                                                        savedEmbedding.getId(),
-                                                                        embedding.getVectorDataPgvector());
-                                                            }
+                                        log.info("Processing batch of {} chunks...", texts.size());
 
-                                                            log.info("Successfully indexed chunk for doc ID: {}",
-                                                                    doc.getId());
-                                                        }).subscribeOn(
-                                                                reactor.core.scheduler.Schedulers.boundedElastic())
-                                                                .then(Mono.just(embedding)))
-                                                        .onErrorResume(e -> {
-                                                            log.error("Error indexing chunk for doc ID: {}",
-                                                                    doc.getId(), e);
-                                                            return Mono.empty();
-                                                        }), 5);
-                                    });
+                                        // 3. Generate embeddings for the batch
+                                        return modelAdapter.generateEmbeddings(texts)
+                                                .flatMapMany(vectors -> {
+                                                    if (vectors.size() != batch.size()) {
+                                                        log.error("Mismatch in embedding count! Sent {}, received {}",
+                                                                batch.size(), vectors.size());
+                                                        return Flux.error(
+                                                                new RuntimeException("Embedding count mismatch"));
+                                                    }
+
+                                                    // 4. Zip vectors with their context and save
+                                                    return Flux.range(0, batch.size())
+                                                            .flatMap(i -> {
+                                                                ChunkContext ctx = batch.get(i);
+                                                                float[] vector = vectors.get(i);
+                                                                return saveEmbedding(ctx.doc(), vector);
+                                                            });
+                                                });
+                                    }, 5); // Concurrency limit for batches
                         })
                         .then());
+    }
+
+    private Mono<Embedding> saveEmbedding(FaqDoc doc, float[] vector) {
+        return Mono.fromCallable(() -> {
+            try {
+                Embedding embedding = new Embedding();
+                embedding.setDoc(doc);
+                // Store in JSON format (backward compatibility)
+                embedding.setVectorData(objectMapper.writeValueAsString(vector));
+                // Store in pgvector format
+                embedding.setVectorDataPgvector(vectorToPgVectorString(vector));
+
+                Embedding savedEmbedding = embeddingRepository.save(embedding);
+
+                // Update pgvector column using native SQL
+                if (embedding.getVectorDataPgvector() != null) {
+                    embeddingRepository.updatePgVector(
+                            savedEmbedding.getId(),
+                            embedding.getVectorDataPgvector());
+                }
+                return savedEmbedding;
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("Error serializing vector", e);
+            }
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
     }
 
     public List<FaqDoc> findRelevantDocs(Long clientId, float[] queryVector, int k) {
@@ -158,24 +167,6 @@ public class EmbeddingService {
         log.info("Demo data cleanup finished.");
     }
 
-    private double cosineSimilarity(float[] v1, float[] v2) {
-        if (v1 == null || v2 == null || v1.length != v2.length || v1.length == 0) {
-            return 0.0;
-        }
-        double dotProduct = 0.0;
-        double normA = 0.0;
-        double normB = 0.0;
-        for (int i = 0; i < v1.length; i++) {
-            dotProduct += v1[i] * v2[i];
-            normA += v1[i] * v1[i];
-            normB += v2[i] * v2[i];
-        }
-        if (normA == 0 || normB == 0) {
-            return 0.0;
-        }
-        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-    }
-
     /**
      * Convert float array to pgvector string format: "[0.1, 0.2, 0.3, ...]"
      */
@@ -190,6 +181,6 @@ public class EmbeddingService {
         return sb.toString();
     }
 
-    private record DocScore(FaqDoc doc, double score) {
+    private record ChunkContext(DocumentChunker.DocumentChunk chunk, FaqDoc doc) {
     }
 }

@@ -35,4 +35,14 @@ public class LocalModelAdapter implements ModelAdapter {
         log.warn("LocalModelAdapter is active. It will return a dummy embedding vector.");
         return Mono.just(new float[768]);
     }
+
+    @Override
+    public Mono<List<float[]>> generateEmbeddings(List<String> texts) {
+        log.warn("LocalModelAdapter is active. Returning dummy embeddings for batch of size: {}", texts.size());
+        List<float[]> embeddings = new java.util.ArrayList<>();
+        for (int i = 0; i < texts.size(); i++) {
+            embeddings.add(new float[768]);
+        }
+        return Mono.just(embeddings);
+    }
 }

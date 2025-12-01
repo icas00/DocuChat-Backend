@@ -15,4 +15,6 @@ public interface ModelAdapter {
     Flux<String> generateAnswerWithFallback(Long clientId, String prompt, List<String> history);
 
     Mono<float[]> generateEmbedding(String text);
+
+    Mono<List<float[]>> generateEmbeddings(List<String> texts);
 }

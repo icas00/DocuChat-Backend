@@ -127,6 +127,29 @@ public class RemoteModelAdapter implements ModelAdapter {
                 });
     }
 
+    @Override
+    public Mono<List<float[]>> generateEmbeddings(List<String> texts) {
+        log.info("Generating embeddings for batch of size: {}", texts.size());
+        Map<String, Object> requestBody = Map.of(
+                "input", texts,
+                "model", properties.getEmbedding().getModel());
+
+        return webClient.post()
+                .uri(properties.getEmbedding().getEndpoint())
+                .header("Authorization", "Bearer " + properties.getEmbedding().getKey())
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(String.class)
+                .doOnSuccess(s -> log.info("Batch embeddings received successfully"))
+                .map(this::extractOpenAIEmbeddings)
+                .retryWhen(Retry.backoff(maxRetryAttempts, Duration.ofSeconds(retryBackoffSeconds)))
+                .onErrorResume(e -> {
+                    log.error("Failed to get batch embeddings from OpenAI-compatible API", e);
+                    return Mono.empty();
+                });
+    }
+
     private String buildUserPrompt(String query, List<FaqDoc> docs) {
         StringBuilder sb = new StringBuilder();
         sb.append("--- KNOWLEDGE BASE ---\n");
@@ -187,6 +210,34 @@ public class RemoteModelAdapter implements ModelAdapter {
             return vector;
         } catch (Exception e) {
             throw new RuntimeException("Error parsing embedding", e);
+        }
+    }
+
+    private List<float[]> extractOpenAIEmbeddings(String jsonResponse) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonResponse);
+            JsonNode dataNode = root.path("data");
+
+            if (dataNode.isMissingNode() || !dataNode.isArray()) {
+                throw new RuntimeException("Embedding data not found in the expected OpenAI format.");
+            }
+
+            List<float[]> vectors = new ArrayList<>();
+            for (JsonNode embeddingItem : dataNode) {
+                JsonNode embeddingNode = embeddingItem.path("embedding");
+                if (embeddingNode.isMissingNode() || !embeddingNode.isArray()) {
+                    continue; // Skip malformed items
+                }
+
+                float[] vector = new float[embeddingNode.size()];
+                for (int i = 0; i < embeddingNode.size(); i++) {
+                    vector[i] = (float) embeddingNode.get(i).asDouble();
+                }
+                vectors.add(vector);
+            }
+            return vectors;
+        } catch (Exception e) {
+            throw new RuntimeException("Error parsing batch embeddings", e);
         }
     }
 
