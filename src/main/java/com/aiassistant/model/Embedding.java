@@ -20,6 +20,9 @@ public class Embedding {
     @Column(name = "vector_data", columnDefinition = "TEXT")
     private String vectorData; // The actual vector (stored as JSON string).
 
+    @Column(name = "vector_data_pgvector", columnDefinition = "vector(1536)")
+    private String vectorDataPgvector; // Vector in pgvector format for fast similarity search
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 }

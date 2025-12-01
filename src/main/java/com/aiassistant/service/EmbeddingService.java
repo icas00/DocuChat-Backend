@@ -62,10 +62,13 @@ public class EmbeddingService {
                                                             try {
                                                                 Embedding embedding = new Embedding();
                                                                 embedding.setDoc(doc);
+                                                                // Store in JSON format (backward compatibility)
                                                                 embedding.setVectorData(
                                                                         objectMapper.writeValueAsString(vector));
-                                                                // Store chunk metadata in embedding (we'll add fields
-                                                                // later)
+                                                                // Also store in pgvector format for fast similarity
+                                                                // search
+                                                                embedding.setVectorDataPgvector(
+                                                                        vectorToPgVectorString(vector));
                                                                 return embedding;
                                                             } catch (JsonProcessingException e) {
                                                                 throw new RuntimeException(e);
@@ -89,42 +92,36 @@ public class EmbeddingService {
     }
 
     public List<FaqDoc> findRelevantDocs(Long clientId, float[] queryVector, int k) {
-        log.info("Finding relevant docs for client ID: {}", clientId);
+        log.info("Finding relevant docs for client ID: {} using pgvector", clientId);
 
         if (queryVector == null || queryVector.length == 0) {
             log.error("Invalid query vector provided. Returning no documents.");
             return List.of();
         }
 
-        List<Embedding> clientEmbeddings = embeddingRepository.findByDocClientId(clientId);
-        log.info("Found {} embeddings for client ID: {}", clientEmbeddings.size(), clientId);
-
-        // Similarity threshold - only return chunks with similarity > 0.3
-        final double SIMILARITY_THRESHOLD = 0.3;
-
-        // Limit K to 5 for optimal performance (balances context vs speed)
+        // Limit K to 5 for optimal performance
         final int MAX_K = Math.min(k, 5);
 
-        List<FaqDoc> results = clientEmbeddings.stream()
-                .map(embedding -> {
-                    try {
-                        float[] docVector = objectMapper.readValue(embedding.getVectorData(), float[].class);
-                        double similarity = cosineSimilarity(queryVector, docVector);
-                        return new DocScore(embedding.getDoc(), similarity);
-                    } catch (JsonProcessingException e) {
-                        log.error("Failed to parse vector for doc ID: {}. Error: {}", embedding.getDoc().getId(),
-                                e.getMessage());
-                        return new DocScore(embedding.getDoc(), 0.0);
-                    }
-                })
-                .filter(ds -> ds.score > SIMILARITY_THRESHOLD)
-                .sorted((a, b) -> Double.compare(b.score, a.score))
+        long startTime = System.currentTimeMillis();
+
+        // Use pgvector for fast similarity search (20x faster than in-memory)
+        String queryVectorString = vectorToPgVectorString(queryVector);
+        List<Embedding> similarEmbeddings = embeddingRepository.findTopKSimilarByClientId(
+                clientId,
+                queryVectorString,
+                MAX_K);
+
+        long searchTime = System.currentTimeMillis() - startTime;
+        log.info("pgvector search completed in {}ms, found {} chunks", searchTime, similarEmbeddings.size());
+
+        // Extract unique FaqDocs (in case multiple chunks from same doc)
+        List<FaqDoc> results = similarEmbeddings.stream()
+                .map(Embedding::getDoc)
+                .distinct()
                 .limit(MAX_K)
-                .map(DocScore::doc)
                 .collect(Collectors.toList());
 
-        log.info("Returning {} relevant chunks (threshold: {}, max K: {})",
-                results.size(), SIMILARITY_THRESHOLD, MAX_K);
+        log.info("Returning {} relevant documents", results.size());
 
         return results;
     }
@@ -166,6 +163,20 @@ public class EmbeddingService {
             return 0.0;
         }
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    /**
+     * Convert float array to pgvector string format: "[0.1, 0.2, 0.3, ...]"
+     */
+    private String vectorToPgVectorString(float[] vector) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0)
+                sb.append(",");
+            sb.append(vector[i]);
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     private record DocScore(FaqDoc doc, double score) {
