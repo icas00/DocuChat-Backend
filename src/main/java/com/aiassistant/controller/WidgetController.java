@@ -23,12 +23,13 @@ public class WidgetController {
     private final ChatService chatService;
     private final ClientService clientService;
 
-    @PostMapping(value = "/stream-chat", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    @PostMapping(value = "/stream-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> streamChat(@RequestBody WidgetRequest request) {
         try {
-            return chatService.processStreamingMessage(request.getApiKey(), request.getMessage(), request.getHistory());
+            return chatService.processStreamingMessage(request.getApiKey(), request.getMessage(), request.getHistory())
+                    .map(chunk -> "data: " + chunk + "\n\n"); // Format as SSE
         } catch (SecurityException e) {
-            return Flux.just("Error: " + e.getMessage());
+            return Flux.just("data: Error: " + e.getMessage() + "\n\n");
         }
     }
 
