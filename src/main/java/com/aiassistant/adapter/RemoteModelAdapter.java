@@ -132,7 +132,8 @@ public class RemoteModelAdapter implements ModelAdapter {
         sb.append("--- KNOWLEDGE BASE ---\n");
         if (docs != null && !docs.isEmpty()) {
             for (FaqDoc doc : docs) {
-                sb.append(doc.getAnswer()).append("\n\n");
+                sb.append("Q: ").append(doc.getQuestion()).append("\n");
+                sb.append("A: ").append(doc.getAnswer()).append("\n\n");
             }
         } else {
             sb.append("[No relevant information found]\n");

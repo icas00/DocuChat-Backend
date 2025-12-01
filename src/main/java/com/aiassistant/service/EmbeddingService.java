@@ -75,7 +75,18 @@ public class EmbeddingService {
                                                             }
                                                         })
                                                         .flatMap(embedding -> Mono.fromRunnable(() -> {
-                                                            embeddingRepository.save(embedding);
+                                                            // Save the embedding (without pgvector field)
+                                                            Embedding savedEmbedding = embeddingRepository
+                                                                    .save(embedding);
+
+                                                            // Update pgvector column using native SQL with proper
+                                                            // casting
+                                                            if (embedding.getVectorDataPgvector() != null) {
+                                                                embeddingRepository.updatePgVector(
+                                                                        savedEmbedding.getId(),
+                                                                        embedding.getVectorDataPgvector());
+                                                            }
+
                                                             log.info("Successfully indexed chunk for doc ID: {}",
                                                                     doc.getId());
                                                         }).subscribeOn(
