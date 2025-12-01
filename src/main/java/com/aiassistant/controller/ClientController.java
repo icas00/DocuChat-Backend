@@ -100,7 +100,7 @@ public class ClientController {
 
     @DeleteMapping("/admin/data")
     public ResponseEntity<ApiResponse> clearSystemData(@RequestHeader("X-Admin-Key") String adminKey) {
-        if (!systemAdminKey.equals(adminKey)) {
+        if (!systemAdminKey.trim().equals(adminKey.trim())) {
             logger.warn("Unauthorized attempt to clear system data.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse("Invalid System Admin Key"));
         }

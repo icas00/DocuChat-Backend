@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 public class AdminKeyFilter extends OncePerRequestFilter {
 
     private final ClientRepository clientRepository;
-    private static final List<String> EXCLUDED_PATHS = List.of("/api/clients/create");
+    private static final List<String> EXCLUDED_PATHS = List.of("/api/clients/create", "/api/clients/admin/data");
     private static final Pattern CLIENT_ID_PATTERN = Pattern.compile("/api/clients/(\\d+)/.*");
 
     // Cache valid admin keys for 5 minutes to reduce DB load

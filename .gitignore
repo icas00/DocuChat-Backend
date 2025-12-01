@@ -37,3 +37,5 @@ build/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+fitzone_handbook.txt
