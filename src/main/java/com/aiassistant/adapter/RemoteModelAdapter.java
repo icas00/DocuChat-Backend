@@ -188,21 +188,26 @@ public class RemoteModelAdapter implements ModelAdapter {
     }
 
     private String extractTextFromStreamChunk(String chunk) {
-        log.debug("Raw chunk received: '{}'", chunk); // ← ADD THIS
+        log.debug("Raw chunk received: '{}'", chunk);
         try {
-            if (chunk.startsWith("data: ")) {
-                String jsonPart = chunk.substring(6).trim();
-                if (jsonPart.equals("[DONE]")) {
-                    return "";
-                }
-                JsonNode root = objectMapper.readTree(jsonPart);
-                String content = root.path("choices").get(0)
-                        .path("delta").path("content").asText("");
-                log.debug("Extracted content: '{}'", content); // ← ADD THIS
-                return content;
+            // Handle [DONE] signal
+            if (chunk.equals("[DONE]") || chunk.equals("data: [DONE]")) {
+                return "";
             }
-            log.warn("Chunk doesn't start with 'data: ': '{}'", chunk); // ← ADD THIS
-            return "";
+
+            // Remove 'data: ' prefix if present
+            String jsonPart = chunk.startsWith("data: ") ? chunk.substring(6).trim() : chunk.trim();
+
+            // Parse JSON and extract content
+            JsonNode root = objectMapper.readTree(jsonPart);
+            String content = root.path("choices").get(0)
+                    .path("delta").path("content").asText("");
+
+            if (!content.isEmpty()) {
+                log.debug("Extracted content: '{}'", content);
+            }
+
+            return content;
         } catch (Exception e) {
             log.warn("Failed to parse stream chunk: {}", chunk, e);
             return "";
