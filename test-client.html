@@ -178,6 +178,13 @@
 
         <div class="chat-box" id="chatBox"></div>
 
+        <div class="input-area" style="margin-bottom: 10px;">
+            <input type="text" id="adminKeyInput" placeholder="Admin Key (required for cleanup)" style="flex: 2;">
+            <input type="number" id="clientIdInput" placeholder="Client ID" value="50" style="flex: 1;">
+            <button onclick="clearData()" style="background: #e74c3c;">Clear Data</button>
+            <button onclick="nukeSystem()" style="background: #c0392b; margin-left: 5px;">Nuke System</button>
+        </div>
+
         <div class="input-area">
             <input type="text" id="messageInput"
                 placeholder="Type your message... (e.g., 'Hey' or 'What's the PTO policy?')"
@@ -213,6 +220,79 @@
             chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
             return messageDiv;
+        }
+
+        async function clearData() {
+            const adminKey = document.getElementById('adminKeyInput').value.trim();
+            const clientId = document.getElementById('clientIdInput').value.trim();
+
+            if (!adminKey || !clientId) {
+                alert('Please enter both Admin Key and Client ID');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete ALL data for Client ${clientId}?`)) {
+                return;
+            }
+
+            addDebugLog(`Clearing data for Client ${clientId}...`, 'info');
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/clients/${clientId}/data`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Key': adminKey
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    addDebugLog(`Success: ${result.message}`, 'success');
+                    alert(result.message);
+                } else {
+                    throw new Error(result.message || response.statusText);
+                }
+            } catch (error) {
+                addDebugLog(`Error clearing data: ${error.message}`, 'error');
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function nukeSystem() {
+            const adminKey = document.getElementById('adminKeyInput').value.trim();
+
+            if (!adminKey) {
+                alert('Please enter the System Admin Key');
+                return;
+            }
+
+            if (!confirm('WARNING: This will delete ALL clients, documents, and embeddings in the ENTIRE system. Are you sure?')) {
+                return;
+            }
+
+            addDebugLog('Nuking system data...', 'info');
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/clients/admin/data`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Key': adminKey
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    addDebugLog(`Success: ${result.message}`, 'success');
+                    alert(result.message);
+                } else {
+                    throw new Error(result.message || response.statusText);
+                }
+            } catch (error) {
+                addDebugLog(`Error nuking system: ${error.message}`, 'error');
+                alert(`Error: ${error.message}`);
+            }
         }
 
         async function sendMessage() {

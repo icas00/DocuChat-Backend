@@ -40,7 +40,7 @@ public class ClientService {
     public void saveDocument(Long clientId, String filename, String content) {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
-        
+
         List<String> sentences = new ArrayList<>();
         BreakIterator iterator = BreakIterator.getSentenceInstance(Locale.US);
         iterator.setText(content);
@@ -60,8 +60,8 @@ public class ClientService {
 
             FaqDoc newDoc = new FaqDoc();
             newDoc.setClient(client);
-            newDoc.setQuestion(currentSentence); 
-            newDoc.setAnswer(contextualChunk); 
+            newDoc.setQuestion(currentSentence);
+            newDoc.setAnswer(contextualChunk);
             faqDocRepository.save(newDoc);
         }
     }
@@ -74,10 +74,16 @@ public class ClientService {
     }
 
     @Transactional
+    public void clearSystemData() {
+        // Deleting all clients will cascade delete all docs and embeddings
+        clientRepository.deleteAll();
+    }
+
+    @Transactional
     public void updateSettings(Long clientId, ClientSettingsDto settings) {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
-        
+
         if (settings.getWidgetColor() != null) {
             client.setWidgetColor(settings.getWidgetColor());
         }
@@ -87,7 +93,7 @@ public class ClientService {
         if (settings.getWelcomeMessage() != null) {
             client.setWelcomeMessage(settings.getWelcomeMessage());
         }
-        
+
         clientRepository.save(client);
     }
 }

@@ -8,6 +8,7 @@ import com.aiassistant.service.ClientService;
 import com.aiassistant.service.EmbeddingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,9 @@ public class ClientController {
     private static final Logger logger = LoggerFactory.getLogger(ClientController.class);
     private final EmbeddingService embeddingService;
     private final ClientService clientService;
+
+    @Value("${app.admin-key}")
+    private String systemAdminKey;
 
     public ClientController(EmbeddingService embeddingService, ClientService clientService) {
         this.embeddingService = embeddingService;
@@ -90,6 +94,23 @@ public class ClientController {
             return ResponseEntity.ok(new ApiResponse(String.format("Successfully deleted %d document(s).", count)));
         } catch (Exception e) {
             logger.error("Error clearing data for client ID: {}", clientId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/data")
+    public ResponseEntity<ApiResponse> clearSystemData(@RequestHeader("X-Admin-Key") String adminKey) {
+        if (!systemAdminKey.equals(adminKey)) {
+            logger.warn("Unauthorized attempt to clear system data.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse("Invalid System Admin Key"));
+        }
+        logger.warn("Clearing ALL SYSTEM DATA requested.");
+        try {
+            clientService.clearSystemData();
+            return ResponseEntity
+                    .ok(new ApiResponse("All system data (clients, documents, embeddings) has been deleted."));
+        } catch (Exception e) {
+            logger.error("Error clearing system data", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(e.getMessage()));
         }
     }
