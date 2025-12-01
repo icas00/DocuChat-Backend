@@ -96,7 +96,7 @@ public class EmbeddingService {
                                                             log.error("Error indexing chunk for doc ID: {}",
                                                                     doc.getId(), e);
                                                             return Mono.empty();
-                                                        }));
+                                                        }), 5);
                                     });
                         })
                         .then());
