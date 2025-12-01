@@ -21,6 +21,7 @@ public class CacheConfig {
     public CacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager("queryEmbeddings");
         cacheManager.setCaffeine(caffeineCacheBuilder());
+        cacheManager.setAsyncCacheMode(true); // Enable async mode for reactive (Mono/Flux) support
         return cacheManager;
     }
 
