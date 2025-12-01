@@ -26,6 +26,7 @@ public class EmbeddingService {
     private final FaqDocRepository faqDocRepository;
     private final EmbeddingRepository embeddingRepository;
     private final ObjectMapper objectMapper;
+    private final DocumentChunker documentChunker;
 
     @Transactional
     public Mono<Void> indexClientDocs(Long clientId) {
@@ -42,28 +43,47 @@ public class EmbeddingService {
                                 log.warn("No documents found to index for client ID: {}", clientId);
                                 return Flux.empty();
                             }
-                            log.info("Found {} documents. Indexing...", allDocuments.size());
+                            log.info("Found {} documents. Chunking and indexing...", allDocuments.size());
+
+                            // Chunk each document into semantic units
                             return Flux.fromIterable(allDocuments)
-                                    .flatMap(doc -> modelAdapter.generateEmbedding(doc.getAnswer())
-                                            .map(vector -> {
-                                                try {
-                                                    Embedding embedding = new Embedding();
-                                                    embedding.setDoc(doc);
-                                                    embedding.setVectorData(objectMapper.writeValueAsString(vector));
-                                                    return embedding;
-                                                } catch (JsonProcessingException e) {
-                                                    throw new RuntimeException(e);
-                                                }
-                                            })
-                                            .flatMap(embedding -> Mono.fromRunnable(() -> {
-                                                embeddingRepository.save(embedding);
-                                                log.info("Successfully indexed doc ID: {}", doc.getId());
-                                            }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-                                                    .then(Mono.just(embedding)))
-                                            .onErrorResume(e -> {
-                                                log.error("Error indexing doc ID: {}", doc.getId(), e);
-                                                return Mono.empty();
-                                            }));
+                                    .flatMap(doc -> {
+                                        // Chunk the document text
+                                        List<DocumentChunker.DocumentChunk> chunks = documentChunker.chunkDocument(
+                                                doc.getAnswer(),
+                                                doc.getId());
+
+                                        log.info("Document ID {} split into {} chunks", doc.getId(), chunks.size());
+
+                                        // Create embeddings for each chunk
+                                        return Flux.fromIterable(chunks)
+                                                .flatMap(chunk -> modelAdapter.generateEmbedding(chunk.getText())
+                                                        .map(vector -> {
+                                                            try {
+                                                                Embedding embedding = new Embedding();
+                                                                embedding.setDoc(doc);
+                                                                embedding.setVectorData(
+                                                                        objectMapper.writeValueAsString(vector));
+                                                                // Store chunk metadata in embedding (we'll add fields
+                                                                // later)
+                                                                return embedding;
+                                                            } catch (JsonProcessingException e) {
+                                                                throw new RuntimeException(e);
+                                                            }
+                                                        })
+                                                        .flatMap(embedding -> Mono.fromRunnable(() -> {
+                                                            embeddingRepository.save(embedding);
+                                                            log.info("Successfully indexed chunk for doc ID: {}",
+                                                                    doc.getId());
+                                                        }).subscribeOn(
+                                                                reactor.core.scheduler.Schedulers.boundedElastic())
+                                                                .then(Mono.just(embedding)))
+                                                        .onErrorResume(e -> {
+                                                            log.error("Error indexing chunk for doc ID: {}",
+                                                                    doc.getId(), e);
+                                                            return Mono.empty();
+                                                        }));
+                                    });
                         })
                         .then());
     }
@@ -79,7 +99,13 @@ public class EmbeddingService {
         List<Embedding> clientEmbeddings = embeddingRepository.findByDocClientId(clientId);
         log.info("Found {} embeddings for client ID: {}", clientEmbeddings.size(), clientId);
 
-        return clientEmbeddings.stream()
+        // Similarity threshold - only return chunks with similarity > 0.3
+        final double SIMILARITY_THRESHOLD = 0.3;
+
+        // Limit K to 5 for optimal performance (balances context vs speed)
+        final int MAX_K = Math.min(k, 5);
+
+        List<FaqDoc> results = clientEmbeddings.stream()
                 .map(embedding -> {
                     try {
                         float[] docVector = objectMapper.readValue(embedding.getVectorData(), float[].class);
@@ -91,11 +117,16 @@ public class EmbeddingService {
                         return new DocScore(embedding.getDoc(), 0.0);
                     }
                 })
-                .filter(ds -> ds.score > 0.3)
+                .filter(ds -> ds.score > SIMILARITY_THRESHOLD)
                 .sorted((a, b) -> Double.compare(b.score, a.score))
-                .limit(k)
+                .limit(MAX_K)
                 .map(DocScore::doc)
                 .collect(Collectors.toList());
+
+        log.info("Returning {} relevant chunks (threshold: {}, max K: {})",
+                results.size(), SIMILARITY_THRESHOLD, MAX_K);
+
+        return results;
     }
 
     @Scheduled(fixedRate = 3600000) // 1 hour

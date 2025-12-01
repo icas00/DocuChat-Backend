@@ -104,8 +104,9 @@ public class RemoteModelAdapter implements ModelAdapter {
     }
 
     @Override
+    @org.springframework.cache.annotation.Cacheable(value = "queryEmbeddings", key = "#text")
     public Mono<float[]> generateEmbedding(String text) {
-        log.info("Generating embedding for text length: {}", text.length());
+        log.info("Generating embedding for text length: {} (cache miss)", text.length());
         Map<String, Object> requestBody = Map.of(
                 "input", text,
                 "model", properties.getEmbedding().getModel());
