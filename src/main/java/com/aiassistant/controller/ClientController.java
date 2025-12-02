@@ -6,6 +6,8 @@ import com.aiassistant.dto.CreateClientResponse;
 import com.aiassistant.model.Client;
 import com.aiassistant.service.ClientService;
 import com.aiassistant.service.EmbeddingService;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,20 +64,35 @@ public class ClientController {
         }
 
         try {
-            String content = new BufferedReader(
-                    new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))
-                    .lines()
-                    .collect(Collectors.joining("\n"));
+            String content;
+            String filename = file.getOriginalFilename();
+
+            if (filename != null && filename.toLowerCase().endsWith(".pdf")) {
+                logger.info("Detected PDF file. Extracting text...");
+                try (PDDocument document = PDDocument.load(file.getInputStream())) {
+                    PDFTextStripper stripper = new PDFTextStripper();
+                    content = stripper.getText(document);
+                }
+            } else {
+                // Default to text parsing
+                content = new BufferedReader(
+                        new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))
+                        .lines()
+                        .collect(Collectors.joining("\n"));
+            }
+
+            // Sanitize content to remove null bytes which Postgres hates
+            content = content.replace("\u0000", "");
 
             logger.info("File parsed successfully. Size: {} chars", content.length());
-            clientService.saveDocument(clientId, file.getOriginalFilename(), content);
+            clientService.saveDocument(clientId, filename, content);
 
             return ResponseEntity.ok(new ApiResponse("Document uploaded successfully. Please trigger indexing next."));
 
         } catch (IOException e) {
             logger.error("Failed to read file", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse("Error processing file"));
+                    .body(new ApiResponse("Error processing file: " + e.getMessage()));
         }
     }
 

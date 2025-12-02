@@ -6,11 +6,14 @@ This project is the backend service for a multi-tenant, embeddable AI chat widge
 
 The backend is built on a streamlined, API-first architecture using Java and Spring Boot. It is designed to be a single, multi-tenant application that can serve thousands of clients simultaneously while keeping their data completely isolated.
 
-- **Technology Stack:** Java 21, Spring Boot 3, Spring Data JPA, Hibernate, Flyway, H2 (for local dev), MySQL (for production).
+- **Technology Stack:** Java 21, Spring Boot 3, Spring Data JPA, Hibernate, Flyway, PostgreSQL (with **pgvector**).
 - **Multi-Tenancy:** Data is partitioned by a `clientId`. Each client has its own set of documents and embeddings, which are accessed via a unique `apiKey`.
 - **RAG Pipeline:** The core logic involves a two-step AI process:
-    1.  **Retrieval:** When a user asks a question, the system generates a vector embedding of the question and uses a cosine similarity search to find the most relevant documents from the client's specific knowledge base.
+    1.  **Retrieval:** When a user asks a question, the system generates a vector embedding of the question and uses a cosine similarity search (via pgvector) to find the most relevant documents from the client's specific knowledge base.
     2.  **Generation:** The relevant documents and the user's question are then passed to a generative AI model (like Groq's Llama 3.1) to synthesize a natural, human-like answer based only on the provided sources.
+- **Optimization:**
+    - **Batch Processing:** Embedding generation is batched (e.g., 50 chunks at a time) to minimize API calls and improve performance.
+    - **Buffer Size:** `WebClient` is configured with a 16MB buffer to handle large batch responses.
 
 ---
 
@@ -22,6 +25,7 @@ The backend is built on a streamlined, API-first architecture using Java and Spr
 - Apache Maven
 - An IDE (like IntelliJ IDEA or VS Code)
 - API keys from your chosen AI providers (e.g., Groq for chat, Mistral for embeddings).
+- PostgreSQL database with `pgvector` extension installed.
 
 ### Environment Variables
 
@@ -35,9 +39,9 @@ The application is configured via environment variables. For local development, 
     - **Purpose:** The API key for your embedding model (e.g., Mistral AI).
     - **Value:** `your_actual_mistral_api_key_here`
 
-3.  `JWT_SECRET`
-    - **Purpose:** A secret key for signing JWTs. While not currently used for the widget, it's required for startup and reserved for a future admin dashboard.
-    - **Value:** `any_random_secret_string_at_least_32_chars_long`
+3.  `APP_ADMIN_KEY`
+    - **Purpose:** The master key for system-wide administrative actions (like "Nuke System").
+    - **Value:** `your_secure_admin_key` (Defaults to `demo-secret-key` if not set).
 
 4.  `REMOTE_CHAT_MODEL`
     - **Purpose:** The model identifier for your chat provider.
@@ -48,8 +52,6 @@ The application is configured via environment variables. For local development, 
 ## Running the Application
 
 ### Local Development
-
-The application is configured to run with an in-memory H2 database for local development.
 
 1.  Set the environment variables listed above in your IDE's Run Configuration.
 2.  Run the `AiAssistantApplication.java` file, or use the Maven command in your terminal:
@@ -83,51 +85,48 @@ These endpoints are for your use as the platform administrator. They are protect
 
 - **URL:** `POST /api/clients/{clientId}/documents`
 - **Headers:**
-  - `X-Admin-Key`: `your_admin_key` (defaults to `demo-secret-key` for local dev)
-- **Body:**
-  ```json
-  {
-      "entries": [
-          {
-              "question": "What are your hours?",
-              "answer": "We are open from 9 AM to 5 PM."
-          }
-      ]
-  }
-  ```
-- **Success Response:** `200 OK` with text "Documents uploaded successfully for client {clientId}".
+  - `X-Admin-Key`: `client_admin_key` (Found in DB or returned on creation)
+- **Body:** Multipart File Upload (`file`)
+- **Success Response:** `200 OK` with text "Document uploaded successfully...".
 
 #### 2. Index Documents for a Client
 
 - **URL:** `POST /api/clients/{clientId}/index`
 - **Headers:**
-  - `X-Admin-Key`: `your_admin_key`
+  - `X-Admin-Key`: `client_admin_key`
 - **Body:** None
 - **Success Response:** `200 OK` with text "Indexing started for client {clientId}".
+
+#### 3. Clear Client Data
+
+- **URL:** `DELETE /api/clients/{clientId}/data`
+- **Headers:**
+  - `X-Admin-Key`: `client_admin_key`
+- **Success Response:** `200 OK` with count of deleted documents.
+
+#### 4. Nuke System (Super Admin)
+
+- **URL:** `DELETE /api/clients/admin/data`
+- **Headers:**
+  - `X-Admin-Key`: `APP_ADMIN_KEY` (System Admin Key)
+- **Success Response:** `200 OK` confirming all system data has been wiped.
 
 ### Public Widget API
 
 This endpoint is used by the frontend JavaScript widget and is publicly accessible.
 
-#### 1. Get Chat Response
+#### 1. Stream Chat Response
 
-- **URL:** `POST /api/widget/chat`
+- **URL:** `POST /api/widget/stream-chat`
 - **Body:**
   ```json
   {
-      "apiKey": "TEST_KEY",
+      "apiKey": "CLIENT_API_KEY",
       "message": "Are you taking new patients?",
       "history": ["User: When can I visit?", "Assistant: We are open from 9 AM to 5 PM."]
   }
   ```
-- **Success Response:** `200 OK` with a JSON body:
-  ```json
-  {
-      "text": "Yes, we are always excited to welcome new patients to our family.",
-      "sources": ["Do you accept new patients?"],
-      "confidence": 0.9
-  }
-  ```
+- **Success Response:** Server-Sent Events (SSE) stream of the answer.
 
 ---
 
@@ -135,7 +134,9 @@ This endpoint is used by the frontend JavaScript widget and is publicly accessib
 
 To test the entire system from scratch after starting the application:
 
-1.  **Upload Documents:** Send a `POST` request to `http://localhost:8080/api/clients/1/documents` with your FAQ data and the `X-Admin-Key` header.
-2.  **Index Documents:** Send a `POST` request to `http://localhost:8080/api/clients/1/index` with the `X-Admin-Key` header.
-3.  **Test Chat:** Send a `POST` request to `http://localhost:8080/api/widget/chat` with a question to verify the AI response.
-4.  **Test Frontend:** Open the `test-client.html` file in your browser to interact with the live widget.
+1.  **Open Test Client:** Open `test-client.html` in your browser.
+2.  **Clear Data:** Enter Client ID (e.g., 50) and Admin Key, then click "Clear Data" to ensure a clean state.
+3.  **Upload Documents:** Use `curl` or Postman to upload a text file to `/api/clients/50/documents`.
+4.  **Index Documents:** Trigger indexing via `/api/clients/50/index`. Watch logs for "Processing batch..." messages.
+5.  **Test Chat:** Use the chat interface in `test-client.html` to ask questions and verify answers.
+6.  **Nuke System:** (Optional) Use the "Nuke System" button with the System Admin Key to wipe everything.
