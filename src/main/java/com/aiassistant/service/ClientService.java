@@ -73,10 +73,15 @@ public class ClientService {
         return faqDocRepository.deleteByClient(client);
     }
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     @Transactional
     public void clearSystemData() {
         // Deleting all clients will cascade delete all docs and embeddings
-        clientRepository.deleteAll();
+        // Using TRUNCATE with RESTART IDENTITY to reset auto-increment counters to 1
+        entityManager.createNativeQuery("TRUNCATE TABLE embeddings, faq_docs, clients RESTART IDENTITY CASCADE")
+                .executeUpdate();
     }
 
     @Transactional

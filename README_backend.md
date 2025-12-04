@@ -6,13 +6,14 @@ This project is the backend service for a multi-tenant, embeddable AI chat widge
 
 The backend is built on a streamlined, API-first architecture using Java and Spring Boot. It is designed to be a single, multi-tenant application that can serve thousands of clients simultaneously while keeping their data completely isolated.
 
-- **Technology Stack:** Java 21, Spring Boot 3, Spring Data JPA, Hibernate, Flyway, PostgreSQL (with **pgvector**).
+- **Technology Stack:** Java 17, Spring Boot 3, Spring Data JPA, Hibernate, Flyway, PostgreSQL (with **pgvector**), Apache PDFBox (for PDF processing), Caffeine (for caching).
 - **Multi-Tenancy:** Data is partitioned by a `clientId`. Each client has its own set of documents and embeddings, which are accessed via a unique `apiKey`.
 - **RAG Pipeline:** The core logic involves a two-step AI process:
     1.  **Retrieval:** When a user asks a question, the system generates a vector embedding of the question and uses a cosine similarity search (via pgvector) to find the most relevant documents from the client's specific knowledge base.
     2.  **Generation:** The relevant documents and the user's question are then passed to a generative AI model (like Groq's Llama 3.1) to synthesize a natural, human-like answer based only on the provided sources.
 - **Optimization:**
     - **Batch Processing:** Embedding generation is batched (e.g., 50 chunks at a time) to minimize API calls and improve performance.
+    - **Caching:** Query embeddings are cached using Caffeine to reduce API calls and latency for repeated queries.
     - **Buffer Size:** `WebClient` is configured with a 16MB buffer to handle large batch responses.
 
 ---
@@ -21,7 +22,7 @@ The backend is built on a streamlined, API-first architecture using Java and Spr
 
 ### Prerequisites
 
-- Java (JDK 21+)
+- Java (JDK 17+)
 - Apache Maven
 - An IDE (like IntelliJ IDEA or VS Code)
 - API keys from your chosen AI providers (e.g., Groq for chat, Mistral for embeddings).
@@ -86,7 +87,7 @@ These endpoints are for your use as the platform administrator. They are protect
 - **URL:** `POST /api/clients/{clientId}/documents`
 - **Headers:**
   - `X-Admin-Key`: `client_admin_key` (Found in DB or returned on creation)
-- **Body:** Multipart File Upload (`file`)
+- **Body:** Multipart File Upload (`file`). Supports `.txt` and `.pdf` files (text is automatically extracted).
 - **Success Response:** `200 OK` with text "Document uploaded successfully...".
 
 #### 2. Index Documents for a Client

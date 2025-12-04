@@ -50,4 +50,13 @@ public interface EmbeddingRepository extends JpaRepository<Embedding, Long> {
                         WHERE id = :embeddingId
                         """, nativeQuery = true)
         void updatePgVector(@Param("embeddingId") Long embeddingId, @Param("vectorString") String vectorString);
+
+        /**
+         * Check if a document has a valid embedding with non-null pgvector data.
+         */
+        @Query(value = "SELECT COUNT(*) > 0 FROM embeddings WHERE doc_id = :docId AND vector_data_pgvector IS NOT NULL", nativeQuery = true)
+        boolean isDocumentIndexed(@Param("docId") Long docId);
+
+        // Helper to find by doc ID (needed for cleanup)
+        List<Embedding> findByDocId(Long docId);
 }

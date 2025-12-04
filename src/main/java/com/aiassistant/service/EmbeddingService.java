@@ -30,11 +30,7 @@ public class EmbeddingService {
 
     @Transactional
     public Mono<Void> indexClientDocs(Long clientId) {
-        return Mono.fromRunnable(() -> {
-            log.info("Starting indexing for client ID: {}", clientId);
-            embeddingRepository.deleteAll(embeddingRepository.findByDocClientId(clientId));
-            log.info("Cleared old embeddings for client.");
-        })
+        return Mono.fromRunnable(() -> log.info("Starting incremental indexing for client ID: {}", clientId))
                 .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
                 .then(Mono.fromCallable(() -> faqDocRepository.findByClientId(clientId))
                         .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
@@ -43,10 +39,30 @@ public class EmbeddingService {
                                 log.warn("No documents found to index for client ID: {}", clientId);
                                 return Flux.empty();
                             }
-                            log.info("Found {} documents. Chunking and indexing...", allDocuments.size());
 
-                            // 1. Flatten all documents into a stream of chunks with their source document
-                            return Flux.fromIterable(allDocuments)
+                            // Filter out documents that already have VALID embeddings
+                            List<FaqDoc> docsToIndex = allDocuments.stream()
+                                    .filter(doc -> !embeddingRepository.isDocumentIndexed(doc.getId()))
+                                    .collect(Collectors.toList());
+
+                            if (docsToIndex.isEmpty()) {
+                                log.info("All documents are already indexed for client ID: {}", clientId);
+                                return Flux.empty();
+                            }
+
+                            log.info("Found {} new or unindexed documents to index.", docsToIndex.size());
+
+                            // Clean up any broken/partial embeddings for these docs before re-indexing
+                            docsToIndex.forEach(doc -> {
+                                List<Embedding> old = embeddingRepository.findByDocId(doc.getId());
+                                if (!old.isEmpty()) {
+                                    log.debug("Removing broken embedding for doc ID: {}", doc.getId());
+                                    embeddingRepository.deleteAll(old);
+                                }
+                            });
+
+                            // 1. Flatten new documents into a stream of chunks with their source document
+                            return Flux.fromIterable(docsToIndex)
                                     .flatMap(doc -> {
                                         List<DocumentChunker.DocumentChunk> chunks = documentChunker.chunkDocument(
                                                 doc.getAnswer(),
