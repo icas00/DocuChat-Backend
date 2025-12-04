@@ -6,7 +6,8 @@ import com.aiassistant.dto.WidgetRequest;
 import com.aiassistant.model.Client;
 import com.aiassistant.service.ChatService;
 import com.aiassistant.service.ClientService;
-import lombok.RequiredArgsConstructor;
+import com.aiassistant.service.ChatService;
+import com.aiassistant.service.ClientService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,11 +18,15 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/widget")
-@RequiredArgsConstructor
 public class WidgetController {
 
     private final ChatService chatService;
     private final ClientService clientService;
+
+    public WidgetController(ChatService chatService, ClientService clientService) {
+        this.chatService = chatService;
+        this.clientService = clientService;
+    }
 
     @PostMapping(value = "/stream-chat", produces = MediaType.TEXT_PLAIN_VALUE)
     public Flux<String> streamChat(@RequestBody WidgetRequest request) {

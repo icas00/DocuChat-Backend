@@ -6,8 +6,8 @@
     }
 
     const apiKey = scriptTag.getAttribute('data-api-key');
-    // HARDCODED BACKEND URL FOR TESTING FRONTEND CHANGES
-    const backendUrl = 'https://icas00-docchat.hf.space';
+    // Allow dynamic backend URL or fallback to script origin (if served from backend) or default
+    const backendUrl = scriptTag.getAttribute('data-backend-url') || 'https://icas00-docchat.hf.space';
 
     if (!apiKey) {
         console.error("DocuChat: Missing data-api-key attribute. Widget will not load.");
@@ -66,6 +66,25 @@
                 }
                 .docu-msg.bot { background: white; border: 1px solid #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; color: #333; }
                 .docu-msg.user { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+                .docu-msg.error { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+                
+                .typing-indicator {
+                    display: flex; gap: 4px; padding: 12px 16px; background: white; border: 1px solid #e2e8f0;
+                    border-radius: 14px; align-self: flex-start; border-bottom-left-radius: 2px;
+                    width: fit-content;
+                }
+                .typing-dot {
+                    width: 6px; height: 6px; background: #94a3b8; border-radius: 50%;
+                    animation: typing 1.4s infinite ease-in-out both;
+                }
+                .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+                .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+                
+                @keyframes typing {
+                    0%, 80%, 100% { transform: scale(0); }
+                    40% { transform: scale(1); }
+                }
+
                 .docu-input-area {
                     padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;
                 }
@@ -77,6 +96,7 @@
                     color: white; border: none;
                     padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px;
                 }
+                .docu-send:disabled { opacity: 0.7; cursor: not-allowed; }
             </style>
             
             <div class="docu-widget-btn">
@@ -110,6 +130,16 @@
         widgetButton.onclick = () => {
             isOpen = !isOpen;
             chatBox.style.display = isOpen ? 'flex' : 'none';
+            if (isOpen) input.focus();
+        };
+
+        const addTypingIndicator = () => {
+            const div = document.createElement('div');
+            div.className = 'typing-indicator';
+            div.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            messagesContainer.appendChild(div);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return div;
         };
 
         const sendMessage = async () => {
@@ -122,7 +152,8 @@
             input.disabled = true;
             sendButton.disabled = true;
 
-            const botMessageElement = addMessage('▋', 'bot');
+            const typingIndicator = addTypingIndicator();
+            let botMessageElement = null;
             let fullBotResponse = '';
 
             try {
@@ -137,40 +168,34 @@
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let buffer = '';
+                let isFirstChunk = true;
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) {
-                        console.log("DocuChat: Stream finished.");
-                        break;
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+
+                    // Remove typing indicator on first chunk
+                    if (isFirstChunk) {
+                        typingIndicator.remove();
+                        botMessageElement = addMessage('▋', 'bot');
+                        isFirstChunk = false;
                     }
 
-                    buffer += decoder.decode(value, { stream: true });
-                    console.log("DocuChat: Received chunk:", buffer);
-
-                    let newlineIndex;
-                    while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
-                        const line = buffer.slice(0, newlineIndex).trim();
-                        buffer = buffer.slice(newlineIndex + 1);
-
-                        console.log("DocuChat: Processing line:", line);
-
+                    // Process SSE format
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
                         if (line.startsWith('data:')) {
-                            const data = line.substring(5); // Don't trim - preserve spaces!
-                            if (data.trim() === '[DONE]') {
-                                continue;
-                            }
-                            // Backend sends plain text chunks with data: prefix
+                            const data = line.substring(5);
+                            if (data.trim() === '[DONE]') continue;
                             if (data) {
-                                console.log("DocuChat: Adding text:", JSON.stringify(data));
                                 fullBotResponse += data;
                                 botMessageElement.innerText = fullBotResponse + '▋';
                                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                             }
                         } else if (line && !line.startsWith(':')) {
-                            // Handle plain text without data: prefix (fallback)
-                            console.log("DocuChat: Adding text (no prefix):", line);
+                            // Fallback for plain text
                             fullBotResponse += line;
                             botMessageElement.innerText = fullBotResponse + '▋';
                             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -178,11 +203,14 @@
                     }
                 }
 
-                botMessageElement.innerText = fullBotResponse; // Final cleanup
-                chatHistory.push('Assistant: ' + fullBotResponse);
+                if (botMessageElement) {
+                    botMessageElement.innerText = fullBotResponse; // Final cleanup
+                    chatHistory.push('Assistant: ' + fullBotResponse);
+                }
 
             } catch (e) {
-                botMessageElement.innerText = `Sorry, an error occurred: ${e.message}`;
+                if (typingIndicator) typingIndicator.remove();
+                addMessage(`Sorry, an error occurred: ${e.message}`, 'error');
                 console.error("DocuChat: Fetch stream error:", e);
             } finally {
                 input.disabled = false;

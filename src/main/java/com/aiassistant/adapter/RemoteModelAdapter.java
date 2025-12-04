@@ -5,8 +5,8 @@ import com.aiassistant.dto.AnswerDTO;
 import com.aiassistant.model.FaqDoc;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -20,15 +20,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@Slf4j
 @Component
 @ConditionalOnProperty(name = "model.adapter", havingValue = "remote", matchIfMissing = true)
-@RequiredArgsConstructor
 public class RemoteModelAdapter implements ModelAdapter {
+
+    private static final Logger log = LoggerFactory.getLogger(RemoteModelAdapter.class);
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final ModelProviderProperties properties;
+
+    public RemoteModelAdapter(WebClient webClient, ObjectMapper objectMapper, ModelProviderProperties properties) {
+        this.webClient = webClient;
+        this.objectMapper = objectMapper;
+        this.properties = properties;
+    }
 
     @Value("${app.prompts.standard}")
     private String standardSystemPrompt;

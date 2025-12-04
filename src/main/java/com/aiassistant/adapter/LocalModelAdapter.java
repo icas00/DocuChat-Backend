@@ -1,8 +1,8 @@
 package com.aiassistant.adapter;
 
-import com.aiassistant.dto.AnswerDTO;
 import com.aiassistant.model.FaqDoc;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -10,10 +10,11 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-@Slf4j
 @Component
 @ConditionalOnProperty(name = "model.adapter", havingValue = "local")
 public class LocalModelAdapter implements ModelAdapter {
+
+    private static final Logger log = LoggerFactory.getLogger(LocalModelAdapter.class);
 
     @Override
     public Flux<String> generateStreamingAnswer(Long clientId, String prompt, List<FaqDoc> relevantDocs,

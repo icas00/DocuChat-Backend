@@ -1,10 +1,26 @@
 package com.aiassistant.dto;
 
-import lombok.Data;
-
 // A single question/answer pair for the FAQ upload.
-@Data
 public class FaqEntry {
     private String question;
     private String answer;
+
+    public FaqEntry() {
+    }
+
+    public String getQuestion() {
+        return question;
+    }
+
+    public void setQuestion(String question) {
+        this.question = question;
+    }
+
+    public String getAnswer() {
+        return answer;
+    }
+
+    public void setAnswer(String answer) {
+        this.answer = answer;
+    }
 }

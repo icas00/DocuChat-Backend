@@ -7,8 +7,13 @@ import com.aiassistant.repository.EmbeddingRepository;
 import com.aiassistant.repository.FaqDocRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,16 +22,34 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class EmbeddingService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
 
     private final ModelAdapter modelAdapter;
     private final FaqDocRepository faqDocRepository;
     private final EmbeddingRepository embeddingRepository;
     private final ObjectMapper objectMapper;
     private final DocumentChunker documentChunker;
+
+    public EmbeddingService(ModelAdapter modelAdapter, FaqDocRepository faqDocRepository,
+            EmbeddingRepository embeddingRepository, ObjectMapper objectMapper, DocumentChunker documentChunker) {
+        this.modelAdapter = modelAdapter;
+        this.faqDocRepository = faqDocRepository;
+        this.embeddingRepository = embeddingRepository;
+        this.objectMapper = objectMapper;
+        this.documentChunker = documentChunker;
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${app.retrieval.max-search-k:10}")
+    private int maxSearchK;
+
+    @org.springframework.beans.factory.annotation.Value("${app.demo.cleanup-enabled:false}")
+    private boolean cleanupEnabled;
+
+    @org.springframework.beans.factory.annotation.Value("${app.demo.client-id:1}")
+    private Long demoClientId;
 
     @Transactional
     public Mono<Void> indexClientDocs(Long clientId) {
@@ -135,8 +158,8 @@ public class EmbeddingService {
             return List.of();
         }
 
-        // Limit K to 5 for optimal performance
-        final int MAX_K = Math.min(k, 5);
+        // Limit K to maxSearchK for optimal performance
+        final int MAX_K = Math.min(k, maxSearchK);
 
         long startTime = System.currentTimeMillis();
 
@@ -165,7 +188,9 @@ public class EmbeddingService {
     @Scheduled(fixedRate = 3600000) // 1 hour
     @Transactional
     public void cleanupDemoData() {
-        Long demoClientId = 1L;
+        if (!cleanupEnabled) {
+            return;
+        }
         log.info("Running scheduled cleanup of demo data for client ID: {}", demoClientId);
 
         List<Embedding> embeddings = embeddingRepository.findByDocClientId(demoClientId);

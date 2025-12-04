@@ -1,9 +1,12 @@
 package com.aiassistant.service;
 
 import com.aiassistant.adapter.ModelAdapter;
+import com.aiassistant.dto.AnswerDTO;
 import com.aiassistant.model.FaqDoc;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
@@ -11,17 +14,26 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class ChatService {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
 
     private final ClientService clientService;
     private final EmbeddingService embeddingService;
     private final ModelAdapter modelAdapter;
     private final CacheService cacheService;
 
-    private static final int TOP_K_DOCS = 15;
+    public ChatService(ClientService clientService, EmbeddingService embeddingService, ModelAdapter modelAdapter,
+            CacheService cacheService) {
+        this.clientService = clientService;
+        this.embeddingService = embeddingService;
+        this.modelAdapter = modelAdapter;
+        this.cacheService = cacheService;
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${app.retrieval.default-top-k:15}")
+    private int defaultTopK;
 
     @Transactional(readOnly = true)
     public Flux<String> processStreamingMessage(String apiKey, String message, List<String> history) {
@@ -36,11 +48,15 @@ public class ChatService {
                                     return Flux.just("Sorry, I couldn't process your question.");
                                 }
 
-                                // Note: Semantic caching is bypassed for streaming responses in this
-                                // implementation.
+                                // Check semantic cache first
+                                Optional<AnswerDTO> cachedOpt = cacheService.findInCache(queryVector);
+                                if (cachedOpt.isPresent()) {
+                                    log.info("Cache hit for query: '{}'", message);
+                                    return Flux.just(cachedOpt.get().getText());
+                                }
 
                                 List<FaqDoc> relevantDocs = embeddingService.findRelevantDocs(client.getId(),
-                                        queryVector, TOP_K_DOCS);
+                                        queryVector, defaultTopK);
 
                                 if (relevantDocs.isEmpty()) {
                                     log.warn("No relevant documents found for query: '{}'. Using fallback.", message);

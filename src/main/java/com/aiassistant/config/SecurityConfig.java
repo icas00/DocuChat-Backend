@@ -1,7 +1,6 @@
 package com.aiassistant.config;
 
 import com.aiassistant.security.AdminKeyFilter;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,10 +15,13 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final AdminKeyFilter adminKeyFilter;
+
+    public SecurityConfig(AdminKeyFilter adminKeyFilter) {
+        this.adminKeyFilter = adminKeyFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

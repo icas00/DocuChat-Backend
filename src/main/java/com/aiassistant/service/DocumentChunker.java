@@ -1,6 +1,7 @@
 package com.aiassistant.service;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -13,9 +14,10 @@ import java.util.regex.Pattern;
  * Uses recursive character splitting with configurable token limits and
  * overlap.
  */
-@Slf4j
 @Service
 public class DocumentChunker {
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentChunker.class);
 
     private static final int DEFAULT_MAX_TOKENS = 500;
     private static final int DEFAULT_OVERLAP_TOKENS = 50;

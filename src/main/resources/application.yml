@@ -70,6 +70,13 @@ model:
 retrieval:
   top-k: 15
   min-similarity-threshold: 0.5
+  default-top-k: 15
+  max-search-k: 10
+
+# Demo Configuration
+demo:
+  cleanup-enabled: false
+  client-id: 1
 
 # Cache Configuration
 cache:

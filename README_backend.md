@@ -10,7 +10,7 @@ The backend is built on a streamlined, API-first architecture using Java and Spr
 - **Multi-Tenancy:** Data is partitioned by a `clientId`. Each client has its own set of documents and embeddings, which are accessed via a unique `apiKey`.
 - **RAG Pipeline:** The core logic involves a two-step AI process:
     1.  **Retrieval:** When a user asks a question, the system generates a vector embedding of the question and uses a cosine similarity search (via pgvector) to find the most relevant documents from the client's specific knowledge base.
-    2.  **Generation:** The relevant documents and the user's question are then passed to a generative AI model (like Groq's Llama 3.1) to synthesize a natural, human-like answer based only on the provided sources.
+    2.  **Generation:** The relevant documents and the user's question are then passed to a generative AI model (defaulting to OpenRouter's GPT-4o-mini) to synthesize a natural, human-like answer based only on the provided sources.
 - **Optimization:**
     - **Batch Processing:** Embedding generation is batched (e.g., 50 chunks at a time) to minimize API calls and improve performance.
     - **Caching:** Query embeddings are cached using Caffeine to reduce API calls and latency for repeated queries.
@@ -25,20 +25,20 @@ The backend is built on a streamlined, API-first architecture using Java and Spr
 - Java (JDK 17+)
 - Apache Maven
 - An IDE (like IntelliJ IDEA or VS Code)
-- API keys from your chosen AI providers (e.g., Groq for chat, Mistral for embeddings).
+- API keys from your chosen AI providers (e.g., OpenRouter).
 - PostgreSQL database with `pgvector` extension installed.
 
 ### Environment Variables
 
-The application is configured via environment variables. For local development, these should be set in your IDE's Run Configuration.
+The application is configured via environment variables (which override `application.yml`). For local development, these should be set in your IDE's Run Configuration.
 
 1.  `REMOTE_CHAT_KEY`
-    - **Purpose:** The API key for your generative chat model (e.g., Groq).
-    - **Value:** `your_actual_groq_api_key_here`
+    - **Purpose:** The API key for your generative chat model (e.g., OpenRouter).
+    - **Value:** `your_actual_api_key_here`
 
 2.  `REMOTE_EMBEDDING_KEY`
-    - **Purpose:** The API key for your embedding model (e.g., Mistral AI).
-    - **Value:** `your_actual_mistral_api_key_here`
+    - **Purpose:** The API key for your embedding model (e.g., OpenRouter/Mistral).
+    - **Value:** `your_actual_api_key_here`
 
 3.  `APP_ADMIN_KEY`
     - **Purpose:** The master key for system-wide administrative actions (like "Nuke System").
@@ -46,7 +46,7 @@ The application is configured via environment variables. For local development, 
 
 4.  `REMOTE_CHAT_MODEL`
     - **Purpose:** The model identifier for your chat provider.
-    - **Value:** `llama-3.1-8b-instant` (or any other current model from your provider).
+    - **Value:** `openai/gpt-4o-mini` (default) or other models supported by your provider.
 
 ---
 
@@ -80,32 +80,43 @@ The API is split into two parts: a secured Admin API for managing clients and a 
 
 ### Admin API
 
-These endpoints are for your use as the platform administrator. They are protected and require a secret admin key to be passed in the `X-Admin-Key` header.
+These endpoints are for your use as the platform administrator.
 
-#### 1. Upload Documents for a Client
+#### 1. Create Client
+- **URL:** `POST /api/clients/create`
+- **Body:** None (Creates a default "New Client")
+- **Success Response:** `201 Created` with JSON containing `id`, `apiKey`, and `adminKey`.
+
+#### 2. Upload Documents for a Client
 
 - **URL:** `POST /api/clients/{clientId}/documents`
-- **Headers:**
-  - `X-Admin-Key`: `client_admin_key` (Found in DB or returned on creation)
 - **Body:** Multipart File Upload (`file`). Supports `.txt` and `.pdf` files (text is automatically extracted).
 - **Success Response:** `200 OK` with text "Document uploaded successfully...".
 
-#### 2. Index Documents for a Client
+#### 3. Index Documents for a Client
 
 - **URL:** `POST /api/clients/{clientId}/index`
-- **Headers:**
-  - `X-Admin-Key`: `client_admin_key`
 - **Body:** None
 - **Success Response:** `200 OK` with text "Indexing started for client {clientId}".
 
-#### 3. Clear Client Data
+#### 4. Update Client Settings
+- **URL:** `PUT /api/clients/{clientId}/settings`
+- **Body:**
+  ```json
+  {
+      "chatbotName": "My Bot",
+      "welcomeMessage": "Hello!",
+      "widgetColor": "#000000"
+  }
+  ```
+- **Success Response:** `200 OK` with text "Settings updated successfully."
+
+#### 5. Clear Client Data
 
 - **URL:** `DELETE /api/clients/{clientId}/data`
-- **Headers:**
-  - `X-Admin-Key`: `client_admin_key`
 - **Success Response:** `200 OK` with count of deleted documents.
 
-#### 4. Nuke System (Super Admin)
+#### 6. Nuke System (Super Admin)
 
 - **URL:** `DELETE /api/clients/admin/data`
 - **Headers:**
@@ -129,6 +140,17 @@ This endpoint is used by the frontend JavaScript widget and is publicly accessib
   ```
 - **Success Response:** Server-Sent Events (SSE) stream of the answer.
 
+#### 2. Get Widget Settings
+- **URL:** `GET /api/widget/settings?apiKey=CLIENT_API_KEY`
+- **Success Response:** `200 OK` with JSON:
+  ```json
+  {
+      "chatbotName": "My Bot",
+      "welcomeMessage": "Hello!",
+      "widgetColor": "#000000"
+  }
+  ```
+
 ---
 
 ## Local Testing Workflow
@@ -136,8 +158,9 @@ This endpoint is used by the frontend JavaScript widget and is publicly accessib
 To test the entire system from scratch after starting the application:
 
 1.  **Open Test Client:** Open `test-client.html` in your browser.
-2.  **Clear Data:** Enter Client ID (e.g., 50) and Admin Key, then click "Clear Data" to ensure a clean state.
-3.  **Upload Documents:** Use `curl` or Postman to upload a text file to `/api/clients/50/documents`.
-4.  **Index Documents:** Trigger indexing via `/api/clients/50/index`. Watch logs for "Processing batch..." messages.
-5.  **Test Chat:** Use the chat interface in `test-client.html` to ask questions and verify answers.
-6.  **Nuke System:** (Optional) Use the "Nuke System" button with the System Admin Key to wipe everything.
+2.  **Create Client:** (If not hardcoded) Use the API to create a client and get the ID/Keys.
+3.  **Clear Data:** Enter Client ID (e.g., 50) and Admin Key, then click "Clear Data" to ensure a clean state.
+4.  **Upload Documents:** Use `curl` or Postman to upload a text file to `/api/clients/{clientId}/documents`.
+5.  **Index Documents:** Trigger indexing via `/api/clients/{clientId}/index`. Watch logs for "Processing batch..." messages.
+6.  **Test Chat:** Use the chat interface in `test-client.html` to ask questions and verify answers.
+7.  **Nuke System:** (Optional) Use the "Nuke System" button with the System Admin Key to wipe everything.

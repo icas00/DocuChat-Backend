@@ -1,11 +1,9 @@
 package com.aiassistant.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
 import java.time.LocalDateTime;
 
 // Stores the AI's "understanding" (vector) of a document.
-@Data
 @Entity
 @Table(name = "embeddings")
 public class Embedding {
@@ -25,4 +23,47 @@ public class Embedding {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    public Embedding() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public FaqDoc getDoc() {
+        return doc;
+    }
+
+    public void setDoc(FaqDoc doc) {
+        this.doc = doc;
+    }
+
+    public String getVectorData() {
+        return vectorData;
+    }
+
+    public void setVectorData(String vectorData) {
+        this.vectorData = vectorData;
+    }
+
+    public String getVectorDataPgvector() {
+        return vectorDataPgvector;
+    }
+
+    public void setVectorDataPgvector(String vectorDataPgvector) {
+        this.vectorDataPgvector = vectorDataPgvector;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

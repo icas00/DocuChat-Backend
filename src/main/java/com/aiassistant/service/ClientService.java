@@ -5,7 +5,8 @@ import com.aiassistant.model.Client;
 import com.aiassistant.model.FaqDoc;
 import com.aiassistant.repository.ClientRepository;
 import com.aiassistant.repository.FaqDocRepository;
-import lombok.RequiredArgsConstructor;
+import com.aiassistant.repository.ClientRepository;
+import com.aiassistant.repository.FaqDocRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,11 +18,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class ClientService {
 
     private final ClientRepository clientRepository;
     private final FaqDocRepository faqDocRepository;
+
+    public ClientService(ClientRepository clientRepository, FaqDocRepository faqDocRepository) {
+        this.clientRepository = clientRepository;
+        this.faqDocRepository = faqDocRepository;
+    }
 
     public Optional<Client> findByApiKey(String apiKey) {
         return clientRepository.findByApiKey(apiKey);
