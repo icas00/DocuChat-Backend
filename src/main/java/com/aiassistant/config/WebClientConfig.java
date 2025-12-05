@@ -19,10 +19,10 @@ public class WebClientConfig {
     public WebClient webClient() {
         // Configure a client with longer timeouts for dealing with slow AI APIs
         HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000) // 30 seconds connection timeout
-                .responseTimeout(Duration.ofSeconds(300)) // 300 seconds response timeout
-                .doOnConnected(conn -> conn.addHandlerLast(new ReadTimeoutHandler(300, TimeUnit.SECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(300, TimeUnit.SECONDS)));
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000) // 10 seconds connection timeout
+                .responseTimeout(Duration.ofSeconds(30)) // 30 seconds response timeout
+                .doOnConnected(conn -> conn.addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)));
 
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))

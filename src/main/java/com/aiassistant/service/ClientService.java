@@ -46,29 +46,13 @@ public class ClientService {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
 
-        List<String> sentences = new ArrayList<>();
-        BreakIterator iterator = BreakIterator.getSentenceInstance(Locale.US);
-        iterator.setText(content);
-        int start = iterator.first();
-        for (int end = iterator.next(); end != BreakIterator.DONE; start = end, end = iterator.next()) {
-            String sentence = content.substring(start, end).trim();
-            if (!sentence.isEmpty()) {
-                sentences.add(sentence);
-            }
-        }
-
-        for (int i = 0; i < sentences.size(); i++) {
-            String currentSentence = sentences.get(i);
-            String prevSentence = (i > 0) ? sentences.get(i - 1) : "";
-            String nextSentence = (i < sentences.size() - 1) ? sentences.get(i + 1) : "";
-            String contextualChunk = (prevSentence + " " + currentSentence + " " + nextSentence).trim();
-
-            FaqDoc newDoc = new FaqDoc();
-            newDoc.setClient(client);
-            newDoc.setQuestion(currentSentence);
-            newDoc.setAnswer(contextualChunk);
-            faqDocRepository.save(newDoc);
-        }
+        // Store the entire document content as a single entry
+        // The EmbeddingService + DocumentChunker will handle semantic splitting later
+        FaqDoc newDoc = new FaqDoc();
+        newDoc.setClient(client);
+        newDoc.setQuestion("Document: " + filename); // Use filename as the "question" / title
+        newDoc.setAnswer(content);
+        faqDocRepository.save(newDoc);
     }
 
     @Transactional

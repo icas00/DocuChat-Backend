@@ -43,6 +43,7 @@ public class ChatService {
                 .switchIfEmpty(Mono.error(new SecurityException("Invalid API Key provided.")))
                 .flatMapMany(client -> {
                     return modelAdapter.generateEmbedding(message)
+                            .switchIfEmpty(Mono.error(new RuntimeException("Failed to generate embedding")))
                             .flatMapMany(queryVector -> {
                                 if (queryVector.length == 0) {
                                     return Flux.just("Sorry, I couldn't process your question.");
@@ -66,6 +67,10 @@ public class ChatService {
                                 return modelAdapter.generateStreamingAnswer(client.getId(), message, relevantDocs,
                                         history);
                             });
+                }).onErrorResume(e -> {
+                    log.error("Error processing message", e);
+                    return Flux.just(
+                            "I apologize, but I'm having trouble connecting to my brain right now. Please try again in a moment.");
                 });
     }
 }
