@@ -6,8 +6,7 @@ import com.aiassistant.dto.WidgetRequest;
 import com.aiassistant.model.Client;
 import com.aiassistant.service.ChatService;
 import com.aiassistant.service.ClientService;
-import com.aiassistant.service.ChatService;
-import com.aiassistant.service.ClientService;
+
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,7 +31,7 @@ public class WidgetController {
     public Flux<String> streamChat(@RequestBody WidgetRequest request) {
         try {
             return chatService.processStreamingMessage(request.getApiKey(), request.getMessage(), request.getHistory())
-                    .map(chunk -> "data: " + chunk + "\n\n"); // Format as SSE manually
+                    .map(chunk -> "data: " + chunk + "\n\n"); // manual sse format
         } catch (SecurityException e) {
             return Flux.just("data: Error: " + e.getMessage() + "\n\n");
         }

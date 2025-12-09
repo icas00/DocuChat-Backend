@@ -5,15 +5,9 @@ import com.aiassistant.model.Client;
 import com.aiassistant.model.FaqDoc;
 import com.aiassistant.repository.ClientRepository;
 import com.aiassistant.repository.FaqDocRepository;
-import com.aiassistant.repository.ClientRepository;
-import com.aiassistant.repository.FaqDocRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.BreakIterator;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,11 +40,10 @@ public class ClientService {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
 
-        // Store the entire document content as a single entry
-        // The EmbeddingService + DocumentChunker will handle semantic splitting later
+        // save full doc here, chunker handles splitting later
         FaqDoc newDoc = new FaqDoc();
         newDoc.setClient(client);
-        newDoc.setQuestion("Document: " + filename); // Use filename as the "question" / title
+        newDoc.setQuestion("Document: " + filename); // filename is the title
         newDoc.setAnswer(content);
         faqDocRepository.save(newDoc);
     }
@@ -67,8 +60,7 @@ public class ClientService {
 
     @Transactional
     public void clearSystemData() {
-        // Deleting all clients will cascade delete all docs and embeddings
-        // Using TRUNCATE with RESTART IDENTITY to reset auto-increment counters to 1
+        // delete everything and reset ids
         entityManager.createNativeQuery("TRUNCATE TABLE embeddings, faq_docs, clients RESTART IDENTITY CASCADE")
                 .executeUpdate();
     }

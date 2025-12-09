@@ -11,7 +11,7 @@ public class Embedding {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "doc_id", nullable = false)
     private FaqDoc doc; // Which FAQ document this embedding belongs to.
 

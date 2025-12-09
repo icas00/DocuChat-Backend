@@ -49,7 +49,7 @@ public class ChatService {
                                     return Flux.just("Sorry, I couldn't process your question.");
                                 }
 
-                                // Check semantic cache first
+                                // checking if we already answered this before
                                 Optional<AnswerDTO> cachedOpt = cacheService.findInCache(queryVector);
                                 if (cachedOpt.isPresent()) {
                                     log.info("Cache hit for query: '{}'", message);

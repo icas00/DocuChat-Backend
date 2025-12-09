@@ -12,21 +12,21 @@ import reactor.netty.http.client.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-@Configuration // This annotation was missing
+@Configuration // needed this for spring to pick it up
 public class WebClientConfig {
 
     @Bean
     public WebClient webClient() {
-        // Configure a client with longer timeouts for dealing with slow AI APIs
+        // need longer timeouts cause ai is slow sometimes
         HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000) // 10 seconds connection timeout
-                .responseTimeout(Duration.ofSeconds(30)) // 30 seconds response timeout
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000) // 10s connect
+                .responseTimeout(Duration.ofSeconds(30)) // 30s response
                 .doOnConnected(conn -> conn.addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
                         .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)));
 
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)) // 16MB
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)) // 16mb buffer
                 .build();
     }
 }

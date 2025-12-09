@@ -63,7 +63,7 @@ public class EmbeddingService {
                                 return Flux.empty();
                             }
 
-                            // Filter out documents that already have VALID embeddings
+                            // skip docs that are already indexed
                             List<FaqDoc> docsToIndex = allDocuments.stream()
                                     .filter(doc -> !embeddingRepository.isDocumentIndexed(doc.getId()))
                                     .collect(Collectors.toList());
@@ -75,7 +75,7 @@ public class EmbeddingService {
 
                             log.info("Found {} new or unindexed documents to index.", docsToIndex.size());
 
-                            // Clean up any broken/partial embeddings for these docs before re-indexing
+                            // removing old broken embeddings just in case
                             docsToIndex.forEach(doc -> {
                                 List<Embedding> old = embeddingRepository.findByDocId(doc.getId());
                                 if (!old.isEmpty()) {
@@ -84,7 +84,7 @@ public class EmbeddingService {
                                 }
                             });
 
-                            // 1. Flatten new documents into a stream of chunks with their source document
+                            // 1. split docs into smaller chunks
                             return Flux.fromIterable(docsToIndex)
                                     .flatMap(doc -> {
                                         List<DocumentChunker.DocumentChunk> chunks = documentChunker.chunkDocument(
@@ -93,7 +93,7 @@ public class EmbeddingService {
                                         return Flux.fromIterable(chunks)
                                                 .map(chunk -> new ChunkContext(chunk, doc));
                                     })
-                                    // 2. Buffer chunks into batches of 50 to reduce API calls
+                                    // 2. group them to save api calls
                                     .buffer(50)
                                     .flatMap(batch -> {
                                         List<String> texts = batch.stream()
@@ -102,7 +102,7 @@ public class EmbeddingService {
 
                                         log.info("Processing batch of {} chunks...", texts.size());
 
-                                        // 3. Generate embeddings for the batch
+                                        // 3. get vectors from ai
                                         return modelAdapter.generateEmbeddings(texts)
                                                 .flatMapMany(vectors -> {
                                                     if (vectors.size() != batch.size()) {
@@ -112,7 +112,7 @@ public class EmbeddingService {
                                                                 new RuntimeException("Embedding count mismatch"));
                                                     }
 
-                                                    // 4. Zip vectors with their context and save
+                                                    // 4. save vectors to db
                                                     return Flux.range(0, batch.size())
                                                             .flatMap(i -> {
                                                                 ChunkContext ctx = batch.get(i);
@@ -120,7 +120,7 @@ public class EmbeddingService {
                                                                 return saveEmbedding(ctx.doc(), vector);
                                                             });
                                                 });
-                                    }, 5); // Concurrency limit for batches
+                                    }, 5); // dont overwhelm the server
                         })
                         .then());
     }
@@ -130,14 +130,15 @@ public class EmbeddingService {
             try {
                 Embedding embedding = new Embedding();
                 embedding.setDoc(doc);
-                // Store in JSON format (backward compatibility)
+                log.info("Saving embedding for Doc ID: {}", doc.getId());
+                // keeping json for backup
                 embedding.setVectorData(objectMapper.writeValueAsString(vector));
-                // Store in pgvector format
+                // this is for pgvector search
                 embedding.setVectorDataPgvector(vectorToPgVectorString(vector));
 
                 Embedding savedEmbedding = embeddingRepository.save(embedding);
 
-                // Update pgvector column using native SQL
+                // need native sql for vector update
                 if (embedding.getVectorDataPgvector() != null) {
                     embeddingRepository.updatePgVector(
                             savedEmbedding.getId(),
@@ -158,12 +159,12 @@ public class EmbeddingService {
             return List.of();
         }
 
-        // Limit K to maxSearchK for optimal performance
+        // dont search too many items
         final int MAX_K = Math.min(k, maxSearchK);
 
         long startTime = System.currentTimeMillis();
 
-        // Use pgvector for fast similarity search (20x faster than in-memory)
+        // pgvector is way faster than doing it in java
         String queryVectorString = vectorToPgVectorString(queryVector);
         List<Embedding> similarEmbeddings = embeddingRepository.findTopKSimilarByClientId(
                 clientId,
@@ -173,7 +174,7 @@ public class EmbeddingService {
         long searchTime = System.currentTimeMillis() - startTime;
         log.info("pgvector search completed in {}ms, found {} chunks", searchTime, similarEmbeddings.size());
 
-        // Extract unique FaqDocs (in case multiple chunks from same doc)
+        // get the actual docs from embeddings
         List<FaqDoc> results = similarEmbeddings.stream()
                 .map(Embedding::getDoc)
                 .distinct()
@@ -208,9 +209,7 @@ public class EmbeddingService {
         log.info("Demo data cleanup finished.");
     }
 
-    /**
-     * Convert float array to pgvector string format: "[0.1, 0.2, 0.3, ...]"
-     */
+    // helper to format vector for postgres
     private String vectorToPgVectorString(float[] vector) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < vector.length; i++) {

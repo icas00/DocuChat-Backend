@@ -16,10 +16,8 @@ This project demonstrates a clear, two-page workflow for managing and testing yo
 
 1.  **Admin Dashboard:** Manage your documents and trigger indexing.
     **[http://localhost:8080/admin.html](http://localhost:8080/admin.html)**
-
 2.  **Live Test Page:** Interact with your chatbot on a simulated client website.
     **[http://localhost:8080/test-client.html](http://localhost:8080/test-client.html)**
-
 **Workflow:**
 1.  **Go to the Admin Dashboard.**
 2.  **Upload a Document:** Use the "Upload Document" section to select a `.txt` or `.md` file (e.g., `Gym.txt`).
@@ -64,7 +62,6 @@ For local development, these should be set in your IDE's Run Configuration.
     mvn spring-boot:run
     ```
 The application will start on `http://localhost:8080`.
-
 ---
 
 ## Deployment to Hugging Face Spaces

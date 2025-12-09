@@ -39,3 +39,14 @@ build/
 Thumbs.db
 
 
+
+# Local credentials
+client_creds.json
+
+# Test data files
+*.txt
+
+.agent/workflows
+.idea
+render.yaml
+widget.js
