@@ -50,3 +50,6 @@ client_creds.json
 .idea
 render.yaml
 widget.js
+README_DETAILS.md
+mvnw
+mvnw.cmd
