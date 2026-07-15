@@ -48,7 +48,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // Be more specific with allowed origins for better security
-        configuration.setAllowedOrigins(List.of(frontendUrl, "https://icas00-docchat.hf.space"));
+        configuration.setAllowedOrigins(List.of(frontendUrl, "https://botforge-engine.onrender.com"));
         configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS", "PUT", "DELETE"));
         configuration.setAllowedHeaders(List.of("*"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
